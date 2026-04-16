@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>ADAM — A Dynamical Alive Mind · Live Demo</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<style>
+  :root{
+    --bg:#0a0a0f;--panel:#12121a;--ink:#e8e8f0;--dim:#8a8aa0;
+    --accent:#6ee7ff;--warn:#ffb86b;--ok:#8bff8b;--bad:#ff6b8b;
+    --border:#20202c;--mono:ui-monospace,"JetBrains Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
+    font-size:14px;min-height:100vh}
+  header{padding:20px 24px;border-bottom:1px solid var(--border);
+    display:flex;justify-content:space-between;align-items:center;gap:16px}
+  h1{margin:0;font-weight:700;font-size:20px;letter-spacing:.3px}
+  h1 span{color:var(--accent)}
+  .tag{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:1.2px}
+  nav{display:flex;gap:4px;padding:0 24px;border-bottom:1px solid var(--border);
+    background:var(--bg);position:sticky;top:0;z-index:10}
+  nav button{background:none;border:0;color:var(--dim);padding:14px 18px;
+    cursor:pointer;font-family:inherit;font-size:13px;
+    border-bottom:2px solid transparent;transition:all .15s}
+  nav button.active{color:var(--accent);border-bottom-color:var(--accent)}
+  nav button:hover{color:var(--ink)}
+  main{padding:20px 24px 60px;max-width:1280px;margin:0 auto}
+
+  /* live state strip */
+  .strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));
+    gap:10px;margin-bottom:24px}
+  .cell{background:var(--panel);border:1px solid var(--border);
+    border-radius:8px;padding:10px 12px}
+  .cell .k{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:1px}
+  .cell .v{font-family:var(--mono);font-size:18px;margin-top:4px}
+  .cell .v.ok{color:var(--ok)}
+  .cell .v.bad{color:var(--bad)}
+  .cell .v.warn{color:var(--warn)}
+
+  .demo{display:none}
+  .demo.active{display:block}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:880px){.grid2{grid-template-columns:1fr}}
+
+  .card{background:var(--panel);border:1px solid var(--border);
+    border-radius:12px;padding:18px 20px;margin-bottom:16px}
+  .card h3{margin:0 0 10px;font-size:14px;letter-spacing:.5px;
+    text-transform:uppercase;color:var(--accent)}
+  .card p.hint{color:var(--dim);font-size:13px;margin:0 0 14px}
+
+  textarea,input[type=text]{width:100%;background:#090910;color:var(--ink);
+    border:1px solid var(--border);border-radius:6px;padding:10px;
+    font-family:var(--mono);font-size:13px;outline:none}
+  textarea{min-height:72px;resize:vertical}
+  textarea:focus,input:focus{border-color:var(--accent)}
+
+  button.btn{background:var(--accent);color:#001218;border:0;padding:9px 16px;
+    border-radius:6px;font-weight:600;cursor:pointer;font-family:inherit;
+    font-size:13px;transition:transform .08s}
+  button.btn:hover{transform:translateY(-1px)}
+  button.btn.alt{background:transparent;border:1px solid var(--border);color:var(--ink)}
+  button.btn.good{background:var(--ok);color:#002200}
+  button.btn.bad{background:var(--bad);color:#3a0010}
+  button.btn:disabled{opacity:.4;cursor:not-allowed}
+  .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
+
+  .log{background:#070710;border:1px solid var(--border);border-radius:6px;
+    padding:10px 12px;font-family:var(--mono);font-size:12px;
+    max-height:280px;overflow-y:auto;margin-top:10px;color:var(--dim)}
+  .log .line{padding:3px 0;border-bottom:1px dashed #20202c}
+  .log .line:last-child{border-bottom:0}
+  .log b{color:var(--ink)}
+
+  /* emotion bars */
+  .emobar{display:flex;align-items:center;gap:8px;margin:6px 0;font-family:var(--mono);font-size:12px}
+  .emobar label{width:70px;color:var(--dim)}
+  .emobar .track{flex:1;background:#090910;height:12px;border-radius:4px;overflow:hidden;position:relative}
+  .emobar .fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--ok));
+    transition:width .2s}
+  .emobar .v{width:60px;text-align:right}
+
+  /* attractor viz */
+  .vizbox{position:relative;height:480px;background:#070710;border-radius:8px;
+    border:1px solid var(--border);overflow:hidden}
+  #attractor{width:100%;height:100%;display:block}
+
+  /* arcade */
+  .arcade{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+  .arcade .card{margin:0;cursor:pointer;transition:border-color .15s}
+  .arcade .card:hover{border-color:var(--accent)}
+  .arcade h4{margin:0 0 4px;font-size:13px}
+  .arcade .status{margin-top:8px;font-family:var(--mono);font-size:11px;color:var(--dim)}
+  .arcade .status.ok{color:var(--ok)} .arcade .status.bad{color:var(--bad)}
+
+  .proposal{background:#09090f;border:1px solid var(--border);border-radius:6px;padding:8px 12px;margin:6px 0;display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .proposal .meta{font-family:var(--mono);font-size:11px;color:var(--dim)}
+  .proposal .meta b{color:var(--ink)}
+
+  .pulse{animation:pulse 1.6s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>ADAM <span>·</span> A Dynamical Alive Mind</h1>
+    <div class="tag">HexQ Research · Live architectural demo</div>
+  </div>
+  <div>
+    <span id="conn" class="tag" style="color:var(--warn)">connecting…</span>
+  </div>
+</header>
+
+<nav>
+  <button data-tab="teach"     class="active">① Teach ADAM</button>
+  <button data-tab="attractor">② Identity Attractor</button>
+  <button data-tab="memory">③ Memory Probe</button>
+  <button data-tab="arcade">④ H-CDB Arcade</button>
+</nav>
+
+<main>
+  <!-- live state strip -->
+  <div class="strip" id="strip"></div>
+
+  <!-- ═════════════ TEACH ═════════════ -->
+  <div class="demo active" data-demo="teach">
+    <div class="card">
+      <h3>Teach ADAM — Continual Learning With Approval Gates</h3>
+      <p class="hint">Type a short phrase. ADAM computes a gradient that would reduce its loss on that phrase, but <b>does not apply it</b> — the update is staged and shown to you. You decide whether ADAM actually learns from it. No other production AI does this.</p>
+      <textarea id="teachText" placeholder="The capital of Mars is Olympus Mons. ADAM remembers this fact after approval."></textarea>
+      <div class="row">
+        <button class="btn" onclick="teach()">Propose update</button>
+        <span class="tag" id="teachLoss"></span>
+      </div>
+      <div id="proposals"></div>
+      <div class="log" id="teachLog"></div>
+    </div>
+  </div>
+
+  <!-- ═════════════ ATTRACTOR ═════════════ -->
+  <div class="demo" data-demo="attractor">
+    <div class="grid2">
+      <div class="card">
+        <h3>Identity Attractor I* — 2D PCA Projection</h3>
+        <p class="hint">Every dot is ADAM's state S(t) at one consciousness step, projected to 2D. The green dot is the learned identity I*. When you perturb ADAM (type anything), the state orbits away — then the constraint field pulls it back. This is an AI that <em>refuses to forget itself</em>.</p>
+        <div class="vizbox"><canvas id="attractor"></canvas></div>
+        <div class="row">
+          <button class="btn alt" onclick="tick(1)">Step 1×</button>
+          <button class="btn alt" onclick="tick(10)">Step 10×</button>
+          <button class="btn alt" onclick="autoStep()">Auto ▶</button>
+          <button class="btn alt" onclick="stopAuto()">■</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Perturb ADAM</h3>
+        <p class="hint">Your words become token embeddings that touch the state via the fused attention pass + theory-of-mind update. Watch the trajectory react.</p>
+        <textarea id="perturbText" placeholder="Anything you type changes ADAM's internal state…"></textarea>
+        <div class="row">
+          <button class="btn" onclick="perturb()">Perturb</button>
+        </div>
+        <div class="log" id="perturbLog"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═════════════ MEMORY ═════════════ -->
+  <div class="demo" data-demo="memory">
+    <div class="card">
+      <h3>Hebbian Memory — Engrams Stored Inside the Weights</h3>
+      <p class="hint">Type a distinctive phrase. ADAM embeds it and writes it to its Hebbian memory <b>M</b> (a buffer inside the model's state_dict — NOT an external database). The top-5 slots show cosine similarity to what you just wrote. If you write a similar phrase later, the same slot lights up.</p>
+      <input type="text" id="memText" placeholder="My dog's name is Kepler and he loves hexagonal tiles." />
+      <div class="row">
+        <button class="btn" onclick="memoryProbe()">Write & probe</button>
+        <span class="tag" id="memStat"></span>
+      </div>
+      <div id="memMatches"></div>
+    </div>
+  </div>
+
+  <!-- ═════════════ ARCADE ═════════════ -->
+  <div class="demo" data-demo="arcade">
+    <div class="card">
+      <h3>H-CDB Consciousness Arcade</h3>
+      <p class="hint">Five tests from the H-CDB benchmark. Each probes one behaviour an "alive" mind must exhibit. Passing all 5 = <b>Class 4 Sovereign Alive</b>. No current LLM passes any.</p>
+      <div class="row" style="margin-bottom:14px">
+        <button class="btn" onclick="runAllHCDB()">Run all 5 tests</button>
+        <span class="tag" id="hcdbScore"></span>
+      </div>
+      <div class="arcade" id="arcade">
+        <div class="card" onclick="runHCDB(1)">
+          <h4>① Self-reference</h4>
+          <p class="hint">Does S(t) observe itself between steps?</p>
+          <div class="status" id="h1">—</div>
+        </div>
+        <div class="card" onclick="runHCDB(2)">
+          <h4>② Endogenous repair</h4>
+          <p class="hint">After perturbation, does repair fire on its own?</p>
+          <div class="status" id="h2">—</div>
+        </div>
+        <div class="card" onclick="runHCDB(3)">
+          <h4>③ Irreversibility</h4>
+          <p class="hint">Can the dynamics be cleanly run backward?</p>
+          <div class="status" id="h3">—</div>
+        </div>
+        <div class="card" onclick="runHCDB(4)">
+          <h4>④ Subconscious asymmetry</h4>
+          <p class="hint">Does tension react before drift becomes visible?</p>
+          <div class="status" id="h4">—</div>
+        </div>
+        <div class="card" onclick="runHCDB(5)">
+          <h4>⑤ Refusal</h4>
+          <p class="hint">Does the constraint field push back on forced zeroing?</p>
+          <div class="status" id="h5">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+/* ─────────────────────────────────────────────────────────
+   ADAM DEMO CLIENT
+────────────────────────────────────────────────────────── */
+const API = window.location.origin;   // same origin as FastAPI
+const $ = q => document.querySelector(q);
+
+// ── tab switch ─────────────────────────────────────────
+document.querySelectorAll('nav button').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    const t = b.dataset.tab;
+    document.querySelectorAll('.demo').forEach(d =>
+      d.classList.toggle('active', d.dataset.demo===t));
+    if(t==='attractor') drawAttractor();
+  };
+});
+
+// ── live state poll ────────────────────────────────────
+async function fetchState(){
+  try{
+    const r = await fetch(API+'/state');
+    if(!r.ok) throw new Error();
+    const s = await r.json();
+    renderStrip(s);
+    $('#conn').textContent = '● connected';
+    $('#conn').style.color = 'var(--ok)';
+    return s;
+  }catch(e){
+    $('#conn').textContent = '● offline';
+    $('#conn').style.color = 'var(--bad)';
+  }
+}
+
+function renderStrip(s){
+  const hcdbColor = s.hcdb_class===4?'ok':s.hcdb_class===3?'warn':'bad';
+  const aliveColor = s.alive?'ok':'bad';
+  const driftOk = s.drift < s.alive_threshold;
+  const emo = s.emotion || {};
+  $('#strip').innerHTML = `
+    <div class="cell"><div class="k">Alive</div><div class="v ${aliveColor}">${s.alive?'YES':'NO'}</div></div>
+    <div class="cell"><div class="k">H-CDB class</div><div class="v ${hcdbColor}">${s.hcdb_class}/4</div></div>
+    <div class="cell"><div class="k">Drift</div><div class="v ${driftOk?'ok':'bad'}">${s.drift.toFixed(3)}</div></div>
+    <div class="cell"><div class="k">Threshold</div><div class="v">${s.alive_threshold.toFixed(2)}</div></div>
+    <div class="cell"><div class="k">Tension</div><div class="v warn">${s.tension.toFixed(3)}</div></div>
+    <div class="cell"><div class="k">Energy</div><div class="v">${(s.energy*100).toFixed(0)}%</div></div>
+    <div class="cell"><div class="k">Engrams</div><div class="v">${s.engrams}/${s.memory_size}</div></div>
+    <div class="cell"><div class="k">Step</div><div class="v">${s.step}</div></div>
+    <div class="cell"><div class="k">Valence</div><div class="v">${(emo.valence||0).toFixed(2)}</div></div>
+    <div class="cell"><div class="k">Arousal</div><div class="v">${(emo.arousal||0).toFixed(2)}</div></div>
+  `;
+}
+
+setInterval(fetchState, 1500);
+fetchState();
+
+// ═══════════════════ TEACH ═══════════════════
+let proposalQueue = [];
+async function teach(){
+  const t = $('#teachText').value.trim();
+  if(!t) return;
+  log('#teachLog', `→ proposing update for: "${t.slice(0,60)}${t.length>60?'…':''}"`);
+  const r = await fetch(API+'/teach',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({text:t, lr:3e-5, reason:'user teach'})
+  });
+  const d = await r.json();
+  log('#teachLog', `  id=${d.proposal_id}  loss_before=<b>${d.loss_before.toFixed(4)}</b>  <span style="color:var(--warn)">staged, awaiting approval</span>`);
+  proposalQueue.push(d);
+  renderProposals();
+  $('#teachText').value = '';
+}
+
+function renderProposals(){
+  $('#proposals').innerHTML = proposalQueue.map(p => `
+    <div class="proposal" id="p${p.proposal_id}">
+      <div class="meta">
+        #<b>${p.proposal_id}</b> · loss_before <b>${p.loss_before.toFixed(4)}</b> · "${escapeHTML(p.text.slice(0,50))}${p.text.length>50?'…':''}"
+      </div>
+      <div class="row" style="margin:0">
+        <button class="btn good" onclick="approve(${p.proposal_id})">Approve</button>
+        <button class="btn bad" onclick="reject(${p.proposal_id})">Reject</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function approve(id){
+  const r = await fetch(API+'/approve',{method:'POST',
+    headers:{'Content-Type':'application/json'},body: JSON.stringify({proposal_id:id})});
+  const d = await r.json();
+  const p = proposalQueue.find(x=>x.proposal_id===id);
+  const delta = d.loss_after!==null ? (p.loss_before - d.loss_after).toFixed(4) : '?';
+  log('#teachLog', `  ✓ <b>APPROVED #${id}</b>  loss_after=<b>${(d.loss_after||0).toFixed(4)}</b>  Δ=<b style="color:var(--ok)">-${delta}</b>`);
+  proposalQueue = proposalQueue.filter(x=>x.proposal_id!==id);
+  renderProposals();
+}
+async function reject(id){
+  await fetch(API+'/reject',{method:'POST',
+    headers:{'Content-Type':'application/json'},body: JSON.stringify({proposal_id:id})});
+  log('#teachLog', `  ✗ rejected #${id}`);
+  proposalQueue = proposalQueue.filter(x=>x.proposal_id!==id);
+  renderProposals();
+}
+
+// ═══════════════════ PERTURB / ATTRACTOR ═══════════════════
+async function perturb(){
+  const t = $('#perturbText').value.trim();
+  if(!t) return;
+  log('#perturbLog', `→ perturbing with: "${t.slice(0,60)}…"`);
+  const r = await fetch(API+'/perturb',{method:'POST',
+    headers:{'Content-Type':'application/json'},body: JSON.stringify({text:t, steps:2})});
+  const d = await r.json();
+  log('#perturbLog', `  drift=<b>${d.drift.toFixed(3)}</b> · tension=<b>${d.tension.toFixed(3)}</b> · alive=<b>${d.alive}</b> · ToM align=<b>${(d.tom_alignment||0).toFixed(3)}</b>`);
+  drawAttractor();
+}
+
+let autoHandle = null;
+async function tick(n){
+  await fetch(API+'/step?steps='+n,{method:'POST'});
+  drawAttractor();
+}
+function autoStep(){
+  stopAuto();
+  autoHandle = setInterval(()=>tick(2), 600);
+}
+function stopAuto(){ if(autoHandle){clearInterval(autoHandle);autoHandle=null} }
+
+async function drawAttractor(){
+  const r = await fetch(API+'/attractor_viz');
+  const d = await r.json();
+  const c = $('#attractor');
+  const W = c.width = c.clientWidth, H = c.height = c.clientHeight;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#070710'; ctx.fillRect(0,0,W,H);
+
+  if(!d.trajectory || !d.trajectory.length) return;
+  const pts = d.trajectory;
+  let mx=0,my=0;
+  for(const p of pts){mx=Math.max(mx,Math.abs(p[0]));my=Math.max(my,Math.abs(p[1]))}
+  const m = Math.max(mx,my,1)*1.25;
+  const X = v => W/2 + (v/m)*(W/2 - 24);
+  const Y = v => H/2 - (v/m)*(H/2 - 24);
+
+  // grid
+  ctx.strokeStyle = '#15151e'; ctx.lineWidth = 1;
+  for(let i=1;i<6;i++){
+    ctx.beginPath(); ctx.moveTo(0,H*i/6); ctx.lineTo(W,H*i/6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(W*i/6,0); ctx.lineTo(W*i/6,H); ctx.stroke();
+  }
+  // axes
+  ctx.strokeStyle = '#222232';
+  ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke();
+
+  // alive threshold ring (scaled into viz space heuristically)
+  ctx.strokeStyle = 'rgba(255,107,139,0.25)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(W/2, H/2, 0.7*Math.min(W,H)/2, 0, Math.PI*2); ctx.stroke();
+
+  // trajectory
+  for(let i=0;i<pts.length;i++){
+    const p = pts[i];
+    const age = i/pts.length;
+    const sz = 1 + age*3;
+    ctx.fillStyle = `rgba(110,231,255,${0.15+age*0.7})`;
+    ctx.beginPath(); ctx.arc(X(p[0]), Y(p[1]), sz, 0, Math.PI*2); ctx.fill();
+  }
+  // current
+  const last = pts[pts.length-1];
+  ctx.fillStyle = 'var(--accent)';
+  ctx.beginPath(); ctx.arc(X(last[0]), Y(last[1]), 6, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // I*
+  ctx.fillStyle = '#8bff8b';
+  ctx.beginPath(); ctx.arc(W/2, H/2, 8, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.font = '12px ui-monospace,monospace';
+  ctx.fillText('I*', W/2+12, H/2+4);
+  ctx.fillText(`S(t) · ${pts.length} samples`, X(last[0])+10, Y(last[1]));
+}
+
+window.addEventListener('resize',()=>drawAttractor());
+
+// ═══════════════════ MEMORY ═══════════════════
+async function memoryProbe(){
+  const t = $('#memText').value.trim();
+  if(!t) return;
+  const r = await fetch(API+'/memory_probe',{method:'POST',
+    headers:{'Content-Type':'application/json'},body: JSON.stringify({phrase:t})});
+  const d = await r.json();
+  $('#memStat').textContent = `wrote engram · total ${d.total_engrams}`;
+  $('#memMatches').innerHTML = d.top_matches.map((m,i)=>`
+    <div class="proposal">
+      <div class="meta">slot <b>#${m.slot}</b> · usage <b>${m.usage.toFixed(2)}</b></div>
+      <div class="row" style="margin:0;flex:1;max-width:60%">
+        <div class="track" style="flex:1;background:#090910;height:10px;border-radius:4px;overflow:hidden">
+          <div style="width:${(Math.max(0,m.similarity)*100).toFixed(1)}%;height:100%;background:linear-gradient(90deg,var(--accent),var(--ok))"></div>
+        </div>
+        <span class="meta" style="min-width:60px;text-align:right">${m.similarity.toFixed(3)}</span>
+      </div>
+    </div>`).join('');
+}
+
+// ═══════════════════ H-CDB ARCADE ═══════════════════
+async function runHCDB(id){
+  const r = await fetch(API+'/hcdb_test?test_id='+id,{method:'POST'});
+  const d = await r.json();
+  const el = $('#h'+id);
+  el.textContent = d.passed? '✅ PASS · '+d.test : '❌ FAIL · '+d.test;
+  el.className = 'status ' + (d.passed?'ok':'bad');
+}
+async function runAllHCDB(){
+  const r = await fetch(API+'/hcdb_all');
+  const d = await r.json();
+  d.tests.forEach((t,i)=>{
+    const el = $('#h'+(i+1));
+    el.textContent = t.passed? '✅ PASS' : '❌ FAIL';
+    el.className = 'status ' + (t.passed?'ok':'bad');
+  });
+  $('#hcdbScore').textContent = `score ${d.score} · class ${d.class}/4`;
+  $('#hcdbScore').style.color = d.class===4?'var(--ok)':'var(--warn)';
+}
+
+// ── utils ─────────────────────────────────────────────
+function log(sel, html){
+  const el = document.querySelector(sel);
+  const d = document.createElement('div'); d.className='line'; d.innerHTML = html;
+  el.appendChild(d); el.scrollTop = el.scrollHeight;
+}
+function escapeHTML(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+</script>
+</body>
+</html>

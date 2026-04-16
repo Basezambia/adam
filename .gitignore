@@ -1,0 +1,80 @@
+# ── Python ────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+
+# ── Model checkpoints (large) ─────────────────
+*.pt
+*.pth
+*.ckpt
+*.bin
+!vercel.json
+# (still allow small config JSONs)
+
+# ── Datasets (huge) ───────────────────────────
+data/
+ESC-50/
+cifar-10-batches-py/
+cifar-10-python.tar.gz
+
+# ── Build / IDE ───────────────────────────────
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+.claude/
+.vercel/
+
+# ── Screenshots / misc ────────────────────────
+screenshots/
+*.log
+
+# ── Old / archived code (kept locally only) ──
+hexcore_omega.py
+hexcore_test.py
+hexcore_test_no_resnet.py
+hexcore_alive/
+hexcore_nanogpt_fusion/
+hexcore_web/
+nanoGPT/
+multihex_bio_agi_v2.py
+multihex_bio_v2.pt
+soul_emergence_experiment.py
+run_fusion.py
+run_hexcore.py
+test_fusion.py
+test_hexcore.py
+test_emergent_properties.py
+test_unified_complete.py
+test_unique_no_other_ai.py
+unified_consciousness.py
+config_multihex_bio_v2.json
+
+# ── Old markdown drafts (keep only the main README + paper) ──
+CODEX_*.md
+COMPLETE_*.md
+DECISION_*.md
+EXAMPLES_*.md
+FINAL_*.md
+HEXCORE_*.md
+OMEGA_*.md
+QUICK_START_GUIDE.md
+README_FUSION.md
+READ_ME_FIRST.md
+RESEARCH_PAPER_*.md
+REWRITE_*.md
+REWRITE_*.txt
+START_HERE*.md
+SUMMARY_*.md
+TEST_FIXES_*.md
+THE_BOOK*.md
+THE_CONSCIOUSNESS_CODEX*.md
+adam_test_results.json
