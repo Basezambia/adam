@@ -96,7 +96,7 @@ def load_adam(checkpoint='adam_checkpoint.pt'):
     LEARNER = ContinualLearner(MODEL, BUFFER,
                                 wake_lr=3e-7, sleep_lr=1.5e-6,
                                 ewc_weight=0.03, enabled=LEARNING_ENABLED)
-    print(f"[v04] experience buffer: {len(BUFFER.buf)} records loaded")
+    print(f"[v04] experience buffer: {len(BUFFER.live)} live records loaded")
     print(f"[v04] personas: {[p['name'] for p in WRAP.identity_bank]}")
 
 
