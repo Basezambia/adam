@@ -63,10 +63,31 @@ def load_adam(checkpoint='adam_checkpoint.pt'):
         hf_repo = os.environ.get('ADAM_HF_REPO')
         if hf_repo:
             try:
-                from huggingface_hub import hf_hub_download
+                from huggingface_hub import hf_hub_download, HfApi
                 print(f"[dl] fetching checkpoint from {hf_repo}")
-                checkpoint = hf_hub_download(repo_id=hf_repo,
-                                             filename='adam_checkpoint.pt')
+                try:
+                    checkpoint = hf_hub_download(repo_id=hf_repo,
+                                                 filename='adam_checkpoint.pt')
+                except Exception:
+                    # Single file not present — try chunked reassembly
+                    print("[dl] single file missing, trying chunks ckpt_part_*.bin")
+                    api = HfApi()
+                    files = api.list_repo_files(hf_repo, repo_type='model')
+                    parts = sorted(f for f in files if f.startswith('ckpt_part_'))
+                    if not parts:
+                        raise RuntimeError("no chunks found on HF repo")
+                    print(f"[dl] reassembling {len(parts)} chunks")
+                    chunk_paths = []
+                    for p in parts:
+                        cp = hf_hub_download(repo_id=hf_repo, filename=p)
+                        chunk_paths.append(cp)
+                    out = 'adam_checkpoint.pt'
+                    with open(out, 'wb') as fo:
+                        for cp in chunk_paths:
+                            with open(cp, 'rb') as fi:
+                                fo.write(fi.read())
+                    checkpoint = out
+                    print(f"[dl] reassembled {os.path.getsize(out)/1e6:.1f} MB")
             except Exception as e:
                 print(f"[warn] HF download failed: {e}")
     if os.path.exists(checkpoint):
