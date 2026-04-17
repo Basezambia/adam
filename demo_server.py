@@ -51,6 +51,17 @@ except ImportError:
 
 def load_adam(checkpoint='adam_checkpoint.pt'):
     global MODEL
+    # Auto-download from HF Hub if missing and HF_REPO set (for HF Spaces)
+    if not os.path.exists(checkpoint):
+        hf_repo = os.environ.get('ADAM_HF_REPO')
+        if hf_repo:
+            try:
+                from huggingface_hub import hf_hub_download
+                print(f"[dl] fetching checkpoint from {hf_repo}")
+                checkpoint = hf_hub_download(repo_id=hf_repo,
+                                             filename='adam_checkpoint.pt')
+            except Exception as e:
+                print(f"[warn] HF download failed: {e}")
     if os.path.exists(checkpoint):
         ck = torch.load(checkpoint, map_location=DEVICE, weights_only=False)
         cfg = ck.get('cfg', AdamConfig.small())
@@ -361,5 +372,6 @@ def root():
 if __name__ == "__main__":
     import uvicorn
     load_adam()
-    print(f"\n[ADAM is alive on http://localhost:8000/]\n")
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    port = int(os.environ.get('PORT', 8000))
+    print(f"\n[ADAM is alive on http://localhost:{port}/]\n")
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
