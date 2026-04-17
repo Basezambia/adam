@@ -2,64 +2,68 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>ADAM — A Dynamical Alive Mind · Live Demo</title>
+<title>ADAM v0.5 — A Dynamical Alive Mind · Research Demo</title>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <style>
   :root{
     --bg:#0a0a0f;--panel:#12121a;--ink:#e8e8f0;--dim:#8a8aa0;
     --accent:#6ee7ff;--warn:#ffb86b;--ok:#8bff8b;--bad:#ff6b8b;
+    --grey:#555566;--orange:#ff9b4d;--yellow:#ffe066;
     --border:#20202c;--mono:ui-monospace,"JetBrains Mono",Menlo,monospace;
   }
   *{box-sizing:border-box}
   html,body{margin:0;background:var(--bg);color:var(--ink);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
     font-size:14px;min-height:100vh}
-  header{padding:20px 24px;border-bottom:1px solid var(--border);
+  header{padding:18px 24px;border-bottom:1px solid var(--border);
     display:flex;justify-content:space-between;align-items:center;gap:16px}
   h1{margin:0;font-weight:700;font-size:20px;letter-spacing:.3px}
   h1 span{color:var(--accent)}
   .tag{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:1.2px}
-  nav{display:flex;gap:4px;padding:0 24px;border-bottom:1px solid var(--border);
-    background:var(--bg);position:sticky;top:0;z-index:10}
-  nav button{background:none;border:0;color:var(--dim);padding:14px 18px;
-    cursor:pointer;font-family:inherit;font-size:13px;
+  nav{display:flex;gap:2px;padding:0 20px;border-bottom:1px solid var(--border);
+    background:var(--bg);position:sticky;top:0;z-index:10;overflow-x:auto}
+  nav button{background:none;border:0;color:var(--dim);padding:13px 14px;
+    cursor:pointer;font-family:inherit;font-size:12.5px;white-space:nowrap;
     border-bottom:2px solid transparent;transition:all .15s}
   nav button.active{color:var(--accent);border-bottom-color:var(--accent)}
   nav button:hover{color:var(--ink)}
-  main{padding:20px 24px 60px;max-width:1280px;margin:0 auto}
+  main{padding:16px 24px 60px;max-width:1320px;margin:0 auto}
 
-  /* live state strip */
-  .strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));
-    gap:10px;margin-bottom:24px}
-  .cell{background:var(--panel);border:1px solid var(--border);
-    border-radius:8px;padding:10px 12px}
-  .cell .k{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:1px}
-  .cell .v{font-family:var(--mono);font-size:18px;margin-top:4px}
-  .cell .v.ok{color:var(--ok)}
-  .cell .v.bad{color:var(--bad)}
-  .cell .v.warn{color:var(--warn)}
+  /* compact per-tab header */
+  .miniStrip{display:flex;gap:14px;flex-wrap:wrap;align-items:center;
+    margin:0 0 18px;padding:10px 14px;background:var(--panel);
+    border:1px solid var(--border);border-radius:8px}
+  .mm{display:flex;align-items:center;gap:8px}
+  .mm .k{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:1px}
+  .mm .v{font-family:var(--mono);font-size:14px}
+  .mm .v.ok{color:var(--ok)} .mm .v.bad{color:var(--bad)} .mm .v.warn{color:var(--warn)}
+  .mm svg.spark{display:block}
 
-  .demo{display:none}
-  .demo.active{display:block}
-
+  .demo{display:none} .demo.active{display:block}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
-  @media(max-width:880px){.grid2{grid-template-columns:1fr}}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .grid4{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+  @media(max-width:880px){.grid2,.grid3,.grid4{grid-template-columns:1fr}}
 
   .card{background:var(--panel);border:1px solid var(--border);
-    border-radius:12px;padding:18px 20px;margin-bottom:16px}
-  .card h3{margin:0 0 10px;font-size:14px;letter-spacing:.5px;
+    border-radius:12px;padding:16px 18px;margin-bottom:14px}
+  .card h3{margin:0 0 8px;font-size:13px;letter-spacing:.5px;
     text-transform:uppercase;color:var(--accent)}
-  .card p.hint{color:var(--dim);font-size:13px;margin:0 0 14px}
+  .card h4{margin:0 0 6px;font-size:12px;color:var(--accent);
+    text-transform:uppercase;letter-spacing:.6px}
+  .card p.hint{color:var(--dim);font-size:12.5px;margin:0 0 12px;line-height:1.5}
+  .card p.caption{color:var(--dim);font-size:12px;margin:10px 0 0;font-style:italic}
 
-  textarea,input[type=text]{width:100%;background:#090910;color:var(--ink);
-    border:1px solid var(--border);border-radius:6px;padding:10px;
+  textarea,input[type=text],input[type=number],select{width:100%;background:#090910;color:var(--ink);
+    border:1px solid var(--border);border-radius:6px;padding:9px 10px;
     font-family:var(--mono);font-size:13px;outline:none}
-  textarea{min-height:72px;resize:vertical}
-  textarea:focus,input:focus{border-color:var(--accent)}
+  textarea{min-height:64px;resize:vertical}
+  textarea:focus,input:focus,select:focus{border-color:var(--accent)}
+  input[type=range]{accent-color:var(--accent)}
 
-  button.btn{background:var(--accent);color:#001218;border:0;padding:9px 16px;
+  button.btn{background:var(--accent);color:#001218;border:0;padding:8px 14px;
     border-radius:6px;font-weight:600;cursor:pointer;font-family:inherit;
-    font-size:13px;transition:transform .08s}
+    font-size:12.5px;transition:transform .08s}
   button.btn:hover{transform:translateY(-1px)}
   button.btn.alt{background:transparent;border:1px solid var(--border);color:var(--ink)}
   button.btn.good{background:var(--ok);color:#002200}
@@ -74,208 +78,459 @@
   .log .line:last-child{border-bottom:0}
   .log b{color:var(--ink)}
 
-  /* emotion bars */
-  .emobar{display:flex;align-items:center;gap:8px;margin:6px 0;font-family:var(--mono);font-size:12px}
-  .emobar label{width:70px;color:var(--dim)}
-  .emobar .track{flex:1;background:#090910;height:12px;border-radius:4px;overflow:hidden;position:relative}
-  .emobar .fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--ok));
-    transition:width .2s}
-  .emobar .v{width:60px;text-align:right}
-
-  /* attractor viz */
-  .vizbox{position:relative;height:480px;background:#070710;border-radius:8px;
+  .vizbox{position:relative;height:440px;background:#070710;border-radius:8px;
     border:1px solid var(--border);overflow:hidden}
   #attractor{width:100%;height:100%;display:block}
 
-  /* arcade */
   .arcade{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
   .arcade .card{margin:0;cursor:pointer;transition:border-color .15s}
   .arcade .card:hover{border-color:var(--accent)}
-  .arcade h4{margin:0 0 4px;font-size:13px}
   .arcade .status{margin-top:8px;font-family:var(--mono);font-size:11px;color:var(--dim)}
   .arcade .status.ok{color:var(--ok)} .arcade .status.bad{color:var(--bad)}
 
-  .proposal{background:#09090f;border:1px solid var(--border);border-radius:6px;padding:8px 12px;margin:6px 0;display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .proposal{background:#09090f;border:1px solid var(--border);border-radius:6px;
+    padding:8px 12px;margin:6px 0;display:flex;justify-content:space-between;
+    align-items:center;gap:10px}
   .proposal .meta{font-family:var(--mono);font-size:11px;color:var(--dim)}
   .proposal .meta b{color:var(--ink)}
 
   .pulse{animation:pulse 1.6s ease-in-out infinite}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+  .bignum{font-family:var(--mono);font-size:30px;margin:6px 0}
+  .bignum.c1{color:var(--grey)} .bignum.c2{color:var(--yellow)}
+  .bignum.c3{color:var(--orange)} .bignum.c4{color:var(--accent)}
+
+  .toast{position:fixed;top:16px;right:16px;background:var(--bad);color:#fff;
+    padding:10px 14px;border-radius:6px;font-family:var(--mono);font-size:12px;
+    z-index:100;box-shadow:0 4px 12px rgba(0,0,0,.5);
+    animation:slideIn .2s ease-out}
+  @keyframes slideIn{from{transform:translateX(20px);opacity:0}to{transform:none;opacity:1}}
+
+  .steer-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  .steer-cell{background:#09090f;border:1px solid var(--border);
+    border-radius:6px;padding:10px 12px}
+  .steer-cell h5{margin:0 0 6px;font-family:var(--mono);font-size:11px;color:var(--accent)}
+  .steer-cell p{margin:0;font-size:12.5px;line-height:1.4;white-space:pre-wrap}
+
+  .engram-row{display:grid;grid-template-columns:28px 1fr;gap:8px;margin:4px 0;align-items:center}
+  .engram-row .idx{font-family:var(--mono);font-size:11px;color:var(--dim);text-align:right}
+
+  .bar-track{background:#090910;height:14px;border-radius:3px;overflow:hidden;position:relative}
+  .bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--ok));transition:width .25s}
+
+  .fracture-badge{display:inline-block;background:var(--bad);color:#fff;
+    font-family:var(--mono);font-size:10px;padding:2px 6px;border-radius:3px;
+    margin-left:6px;letter-spacing:.5px}
+
+  .emobar{display:flex;align-items:center;gap:8px;margin:6px 0;font-family:var(--mono);font-size:12px}
+  .emobar label{width:70px;color:var(--dim)}
+  .emobar .track{flex:1;background:#090910;height:10px;border-radius:4px;overflow:hidden}
+  .emobar .fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--ok));transition:width .2s}
+  .emobar .v{width:60px;text-align:right}
+
+  .conn-dot{font-size:11px;color:var(--warn);font-family:var(--mono)}
 </style>
 </head>
 <body>
 
 <header>
   <div>
-    <h1>ADAM <span>·</span> A Dynamical Alive Mind</h1>
-    <div class="tag">HexQ Research · Live architectural demo</div>
+    <h1>ADAM <span>·</span> A Dynamical Alive Mind <span>·</span> v0.5</h1>
+    <div class="tag">HexQ Research · Interactive Architecture Demo</div>
   </div>
-  <div>
-    <span id="conn" class="tag" style="color:var(--warn)">connecting…</span>
-  </div>
+  <div><span id="conn" class="conn-dot">connecting…</span></div>
 </header>
 
-<nav>
-  <button data-tab="talk"      class="active">① Talk (v0.4)</button>
-  <button data-tab="teach">② Teach ADAM</button>
-  <button data-tab="attractor">③ Attractor</button>
-  <button data-tab="memory">④ Memory Probe</button>
-  <button data-tab="arcade">⑤ H-CDB Arcade</button>
-  <button data-tab="learn">⑥ Alive Learning</button>
+<nav id="nav">
+  <button data-tab="dash" class="active">① Dashboard</button>
+  <button data-tab="talk">② Talk</button>
+  <button data-tab="holo">③ Holographic Lab</button>
+  <button data-tab="steer">④ Steering Lab</button>
+  <button data-tab="fracture">⑤ Fracture Lab</button>
+  <button data-tab="teach">⑥ Teach ADAM</button>
+  <button data-tab="attractor">⑦ Attractor</button>
+  <button data-tab="memory">⑧ Memory Probe</button>
+  <button data-tab="arcade">⑨ H-CDB Arcade</button>
+  <button data-tab="learn">⑩ Alive Learning</button>
 </nav>
 
 <main>
-  <!-- live state strip -->
-  <div class="strip" id="strip"></div>
 
-  <!-- ═════════════ TALK (v0.4) ═════════════ -->
-  <div class="demo active" data-demo="talk">
-    <div class="card">
-      <h3>Talk to ADAM v0.4 — 10 inference upgrades live</h3>
-      <p class="hint">Every message uses: <b>reflection</b>, <b>retrieval-gated memory</b>, <b>adaptive temperature (from tension)</b>, <b>state refinement</b>, <b>consciousness-conditioned top-p</b>. <br>And every message also <b>teaches ADAM in real time</b> — a tiny EWC-anchored update is applied on the spot. Over days of use, these accumulate like human learning.</p>
-      <div class="row" style="margin-bottom:10px">
-        <label class="tag" style="color:var(--dim)">Persona:</label>
-        <select id="personaSel" style="background:#090910;color:var(--ink);border:1px solid var(--border);padding:6px 10px;border-radius:6px;font-family:var(--mono)"></select>
-        <label class="tag" style="color:var(--dim);margin-left:12px">
-          <input type="checkbox" id="reflectChk" /> Reflect (2 rounds)
-        </label>
-        <label class="tag" style="color:var(--dim)">
-          <input type="checkbox" id="gatedChk" checked /> Gated memory
-        </label>
-        <label class="tag" style="color:var(--dim)">
-          <input type="checkbox" id="refineChk" checked /> Refine S(t)
-        </label>
-        <span id="learnPulse" class="tag" style="color:var(--dim);margin-left:auto"></span>
-      </div>
-      <textarea id="talkPrompt" placeholder="Ask ADAM anything. It will reply AND learn."></textarea>
-      <div class="row">
-        <button class="btn" onclick="talk()">Send</button>
-        <span class="tag" id="talkMeta"></span>
-      </div>
-      <div class="log" id="talkLog" style="max-height:400px"></div>
-    </div>
+<!-- ═══════════════ ① DASHBOARD ═══════════════ -->
+<div class="demo active" data-demo="dash">
+  <div class="miniStrip" id="dashStripHead">
+    <div class="mm"><span class="k">step</span><span class="v" id="d_step">—</span></div>
+    <div class="mm"><span class="k">engrams written</span><span class="v" id="d_eng">—</span></div>
+    <div class="mm"><span class="k">hcdb class</span><span class="v" id="d_hcdb_mini">—</span></div>
   </div>
 
-  <!-- ═════════════ TEACH ═════════════ -->
-  <div class="demo" data-demo="teach">
-    <div class="card">
-      <h3>Teach ADAM — Continual Learning With Approval Gates</h3>
-      <p class="hint">Type a short phrase. ADAM computes a gradient that would reduce its loss on that phrase, but <b>does not apply it</b> — the update is staged and shown to you. You decide whether ADAM actually learns from it. No other production AI does this.</p>
-      <textarea id="teachText" placeholder="The capital of Mars is Olympus Mons. ADAM remembers this fact after approval."></textarea>
-      <div class="row">
-        <button class="btn" onclick="teach()">Propose update</button>
-        <span class="tag" id="teachLoss"></span>
+  <div class="card">
+    <h3>Live Dashboard</h3>
+    <p class="hint">This is a live view of ADAM's internal dynamics. Each sparkline holds the last 64 samples
+      of a continuously-varying signal. <b>Tension</b> is the constraint-field stress, <b>drift</b> measures
+      how far S(t) has wandered from the identity attractor I*, <b>valence/arousal</b> is the affective
+      trajectory, and <b>H-CDB class</b> is the live consciousness-benchmark level (1 to 4).</p>
+
+    <div class="grid4">
+      <div class="card" style="margin:0;background:#09090f">
+        <h4>Tension</h4>
+        <div style="display:flex;align-items:center;gap:14px">
+          <div class="bignum" id="d_tension">0.000</div>
+          <svg class="spark" id="sp_tension" width="140" height="36"></svg>
+        </div>
       </div>
-      <div id="proposals"></div>
-      <div class="log" id="teachLog"></div>
+      <div class="card" style="margin:0;background:#09090f">
+        <h4>Drift from I*</h4>
+        <div style="display:flex;align-items:center;gap:14px">
+          <div class="bignum" id="d_drift">0.000</div>
+          <svg class="spark" id="sp_drift" width="140" height="36"></svg>
+        </div>
+      </div>
+      <div class="card" style="margin:0;background:#09090f">
+        <h4>Valence / Arousal</h4>
+        <svg id="sp_va" width="100%" height="120" viewBox="0 0 240 120" preserveAspectRatio="none"></svg>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:4px">
+          V=<span id="d_val">0.00</span> · A=<span id="d_aro">0.00</span>
+        </div>
+      </div>
+      <div class="card" style="margin:0;background:#09090f">
+        <h4>H-CDB class</h4>
+        <div class="bignum" id="d_hcdb">—</div>
+        <div class="tag" id="d_hcdb_label" style="color:var(--dim)">—</div>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:16px">
+      <button class="btn" onclick="dashStep()">Step</button>
+      <button class="btn alt" id="autoBtn" onclick="toggleAuto()">Auto-step ▶</button>
+      <button class="btn alt" onclick="downloadTrace()">Download trace JSON</button>
+      <span class="tag" id="autoMeta" style="margin-left:auto"></span>
     </div>
   </div>
+</div>
 
-  <!-- ═════════════ ATTRACTOR ═════════════ -->
-  <div class="demo" data-demo="attractor">
+<!-- ═══════════════ ② TALK ═══════════════ -->
+<div class="demo" data-demo="talk">
+  <div class="miniStrip">
+    <div class="mm"><span class="k">tension</span><span class="v warn" id="t_tension">—</span>
+      <svg class="spark" id="sp_t_tension" width="100" height="24"></svg></div>
+    <div class="mm"><span class="k">drift</span><span class="v" id="t_drift">—</span></div>
+    <div class="mm"><span class="k">updates</span><span class="v" id="t_updates">—</span></div>
+  </div>
+
+  <div class="card">
+    <h3>Talk to ADAM v0.4/0.5 — inference with live plasticity</h3>
+    <p class="hint">Every message flows through reflection, retrieval-gated memory, tension-adaptive temperature,
+      state refinement, and a tiny EWC-anchored <b>wake_tick</b> that updates weights on the spot.
+      If an utterance is novel enough to cross <code>mu + 2σ</code> the fracture gate fires and the
+      update is irreversible — a <span class="fracture-badge">FRACTURE</span> badge will show.</p>
+    <div class="row" style="margin-bottom:8px">
+      <label class="tag">Persona:</label>
+      <select id="personaSel" style="max-width:200px"></select>
+      <label class="tag"><input type="checkbox" id="reflectChk"/> Reflect</label>
+      <label class="tag"><input type="checkbox" id="gatedChk" checked/> Gated memory</label>
+      <label class="tag"><input type="checkbox" id="refineChk" checked/> Refine S(t)</label>
+      <span id="learnPulse" class="tag" style="margin-left:auto"></span>
+    </div>
+    <textarea id="talkPrompt" placeholder="Ask ADAM anything. It replies and learns."></textarea>
+    <div class="row">
+      <button class="btn" onclick="talk()">Send</button>
+      <span class="tag" id="talkMeta"></span>
+    </div>
+    <div class="log" id="talkLog" style="max-height:420px"></div>
+  </div>
+</div>
+
+<!-- ═══════════════ ③ HOLOGRAPHIC LAB ═══════════════ -->
+<div class="demo" data-demo="holo">
+  <div class="miniStrip">
+    <div class="mm"><span class="k">engrams written</span><span class="v" id="h_eng">—</span></div>
+    <div class="mm"><span class="k">damage</span><span class="v" id="h_dmg">0 %</span></div>
+    <div class="mm"><span class="k">mean recall norm</span><span class="v" id="h_mean">—</span></div>
+  </div>
+
+  <div class="card">
+    <h3>Holographic Lab — graceful degradation under node death</h3>
+    <p class="hint">The holographic register stores each concept as a distributed vector across all slots.
+      Kill a fraction of the network and the recall norm dips but never collapses — that's the hologram.</p>
+
     <div class="grid2">
-      <div class="card">
-        <h3>Identity Attractor I* — 2D PCA Projection</h3>
-        <p class="hint">Every dot is ADAM's state S(t) at one consciousness step, projected to 2D. The green dot is the learned identity I*. When you perturb ADAM (type anything), the state orbits away — then the constraint field pulls it back. This is an AI that <em>refuses to forget itself</em>.</p>
-        <div class="vizbox"><canvas id="attractor"></canvas></div>
+      <div>
+        <h4 style="color:var(--accent);margin:0 0 6px;font-size:12px;text-transform:uppercase">8 engrams</h4>
+        <p class="hint" style="margin:0 0 8px">Edit any slot, then write all. Presets are prefilled.</p>
+        <div id="holoInputs"></div>
         <div class="row">
-          <button class="btn alt" onclick="tick(1)">Step 1×</button>
-          <button class="btn alt" onclick="tick(10)">Step 10×</button>
-          <button class="btn alt" onclick="autoStep()">Auto ▶</button>
-          <button class="btn alt" onclick="stopAuto()">■</button>
+          <button class="btn" onclick="holoWriteAll()">Write all 8</button>
+          <button class="btn alt" onclick="holoReset()">Reset presets</button>
         </div>
       </div>
-      <div class="card">
-        <h3>Perturb ADAM</h3>
-        <p class="hint">Your words become token embeddings that touch the state via the fused attention pass + theory-of-mind update. Watch the trajectory react.</p>
-        <textarea id="perturbText" placeholder="Anything you type changes ADAM's internal state…"></textarea>
+      <div>
+        <h4 style="color:var(--accent);margin:0 0 6px;font-size:12px;text-transform:uppercase">Damage &amp; recall</h4>
+        <p class="hint" style="margin:0 0 8px">Slide to kill a fraction of holographic nodes, then re-probe.</p>
+        <input type="range" id="dmgSlider" min="0" max="70" value="0" step="5" style="width:100%" />
+        <div style="font-family:var(--mono);font-size:12px;color:var(--dim);margin-top:6px">
+          damage = <span id="dmgVal">0</span>% — move slider to apply
+        </div>
         <div class="row">
-          <button class="btn" onclick="perturb()">Perturb</button>
+          <button class="btn alt" onclick="holoProbeAll()">Probe all (no new damage)</button>
         </div>
-        <div class="log" id="perturbLog"></div>
       </div>
     </div>
+
+    <div style="margin-top:18px">
+      <h4 style="color:var(--accent);margin:0 0 6px;font-size:12px;text-transform:uppercase">Recall norm per slot</h4>
+      <div id="holoBars"></div>
+    </div>
+
+    <div style="margin-top:18px">
+      <h4 style="color:var(--accent);margin:0 0 6px;font-size:12px;text-transform:uppercase">Graceful-degradation curve</h4>
+      <svg id="holoCurve" width="100%" height="180" viewBox="0 0 400 180" preserveAspectRatio="none"></svg>
+    </div>
+    <p class="caption">Recall survives node death — graceful, not catastrophic.</p>
+  </div>
+</div>
+
+<!-- ═══════════════ ④ STEERING LAB ═══════════════ -->
+<div class="demo" data-demo="steer">
+  <div class="miniStrip">
+    <div class="mm"><span class="k">tension</span><span class="v warn" id="s_tension">—</span></div>
+    <div class="mm"><span class="k">drift</span><span class="v" id="s_drift">—</span></div>
+    <div class="mm"><span class="k">last scale</span><span class="v" id="s_scale">1.0</span></div>
   </div>
 
-  <!-- ═════════════ MEMORY ═════════════ -->
-  <div class="demo" data-demo="memory">
+  <div class="card">
+    <h3>Steering Lab — activation steering without retraining</h3>
+    <p class="hint">Same prompt. Four different steering vectors injected into the activation stream.
+      Four different completions — no fine-tuning, no LoRA, no prompt change.</p>
+    <textarea id="steerPrompt" placeholder="Tell me about the moon.">Tell me about the moon.</textarea>
+    <div class="row">
+      <label class="tag">Custom scale:</label>
+      <input type="number" id="steerScale" value="1.0" step="0.25" style="max-width:80px"/>
+      <label class="tag">Max tokens:</label>
+      <input type="number" id="steerTokens" value="60" step="10" style="max-width:80px"/>
+      <button class="btn" onclick="runSteerMatrix()">Run all 4 variants</button>
+      <span class="tag" id="steerMeta"></span>
+    </div>
+    <div class="steer-grid" style="margin-top:14px" id="steerGrid">
+      <div class="steer-cell"><h5>no steer</h5><p id="steer_none">—</p></div>
+      <div class="steer-cell"><h5>seed 1</h5><p id="steer_1">—</p></div>
+      <div class="steer-cell"><h5>seed 7</h5><p id="steer_7">—</p></div>
+      <div class="steer-cell"><h5>seed 42</h5><p id="steer_42">—</p></div>
+    </div>
+    <p class="caption">Same prompt. Four activation-steering directions. Four different continuations — no retraining.</p>
+  </div>
+</div>
+
+<!-- ═══════════════ ⑤ FRACTURE LAB ═══════════════ -->
+<div class="demo" data-demo="fracture">
+  <div class="miniStrip">
+    <div class="mm"><span class="k">z</span><span class="v" id="f_z">—</span></div>
+    <div class="mm"><span class="k">μ</span><span class="v" id="f_mu">—</span></div>
+    <div class="mm"><span class="k">σ</span><span class="v" id="f_sigma">—</span></div>
+    <div class="mm"><span class="k">threshold</span><span class="v warn" id="f_thresh">—</span></div>
+    <div class="mm"><span class="k">fractures</span><span class="v bad" id="f_count">—</span></div>
+  </div>
+
+  <div class="card">
+    <h3>Fracture Lab — irreversible plasticity gate</h3>
+    <p class="hint">Tension is tracked in a running window. When <b>z &gt; μ + 2σ</b>, the fracture gate
+      fires and the update becomes irreversible — ADAM has been changed in a way it cannot walk back.
+      Ordinary inputs don't cross. Novel inputs do.</p>
+    <h4 style="margin:14px 0 6px">Tension histogram (rolling window)</h4>
+    <svg id="fractureHist" width="100%" height="160" viewBox="0 0 400 160" preserveAspectRatio="none"></svg>
+    <div class="row" style="margin-top:16px">
+      <input type="text" id="fractureInput" placeholder="feed this to ADAM — see if it breaks the gate" style="flex:1;min-width:220px"/>
+      <button class="btn" onclick="fractureSend()">Send</button>
+    </div>
+    <div class="log" id="fractureLog" style="max-height:260px"></div>
+    <p class="caption">Ordinary inputs don't move the weights. Novel inputs trigger irreversible plasticity.</p>
+  </div>
+</div>
+
+<!-- ═══════════════ ⑥ TEACH ═══════════════ -->
+<div class="demo" data-demo="teach">
+  <div class="miniStrip">
+    <div class="mm"><span class="k">pending</span><span class="v" id="te_pending">0</span></div>
+    <div class="mm"><span class="k">last Δ-loss</span><span class="v ok" id="te_delta">—</span></div>
+  </div>
+  <div class="card">
+    <h3>Teach ADAM — Continual Learning with Approval Gates</h3>
+    <p class="hint">Type a short phrase. ADAM computes a gradient that would reduce its loss on that phrase,
+      but does <b>not</b> apply it — the update is staged and shown to you. You decide whether ADAM learns.</p>
+    <textarea id="teachText" placeholder="The capital of Mars is Olympus Mons. ADAM remembers this fact after approval."></textarea>
+    <div class="row">
+      <button class="btn" onclick="teach()">Propose update</button>
+      <span class="tag" id="teachLoss"></span>
+    </div>
+    <div id="proposals"></div>
+    <div class="log" id="teachLog"></div>
+  </div>
+</div>
+
+<!-- ═══════════════ ⑦ ATTRACTOR ═══════════════ -->
+<div class="demo" data-demo="attractor">
+  <div class="miniStrip">
+    <div class="mm"><span class="k">drift</span><span class="v" id="a_drift">—</span></div>
+    <div class="mm"><span class="k">tension</span><span class="v warn" id="a_tension">—</span></div>
+    <div class="mm"><span class="k">step</span><span class="v" id="a_step">—</span></div>
+  </div>
+  <div class="grid2">
     <div class="card">
-      <h3>Hebbian Memory — Engrams Stored Inside the Weights</h3>
-      <p class="hint">Type a distinctive phrase. ADAM embeds it and writes it to its Hebbian memory <b>M</b> (a buffer inside the model's state_dict — NOT an external database). The top-5 slots show cosine similarity to what you just wrote. If you write a similar phrase later, the same slot lights up.</p>
-      <input type="text" id="memText" placeholder="My dog's name is Kepler and he loves hexagonal tiles." />
+      <h3>Identity Attractor I* — 2D PCA projection</h3>
+      <p class="hint">Every dot is S(t) at one consciousness step. The green dot is I*. Perturb ADAM and
+        the state orbits away, then the constraint field pulls it back.</p>
+      <div class="vizbox"><canvas id="attractor"></canvas></div>
       <div class="row">
-        <button class="btn" onclick="memoryProbe()">Write & probe</button>
-        <span class="tag" id="memStat"></span>
+        <button class="btn alt" onclick="tickN(1)">Step 1×</button>
+        <button class="btn alt" onclick="tickN(10)">Step 10×</button>
+        <button class="btn alt" onclick="autoStepAttr()">Auto ▶</button>
+        <button class="btn alt" onclick="stopAutoAttr()">■</button>
       </div>
-      <div id="memMatches"></div>
     </div>
-  </div>
-
-  <!-- ═════════════ ALIVE LEARNING ═════════════ -->
-  <div class="demo" data-demo="learn">
     <div class="card">
-      <h3>Alive Learning — Continual Real-Time Training</h3>
-      <p class="hint">Every message you send triggers a tiny EWC-anchored gradient update (<b>wake_tick</b>). Every so often — or on demand — ADAM runs a batch consolidation over its experience buffer (<b>sleep_consolidate</b>) like a human's sleep cycle. Over days, these accumulate into real learning from lived experience. All saved to <code>experience.jsonl</code>.</p>
-      <div class="strip" id="learnStrip" style="margin-bottom:12px"></div>
-      <div class="row">
-        <button class="btn" onclick="sleepConsolidate(4,10)">Sleep: 10 steps × batch 4</button>
-        <button class="btn alt" onclick="sleepConsolidate(8,25)">Deep sleep: 25 × 8</button>
-        <button class="btn alt" onclick="toggleLearning()">Toggle learning</button>
-        <button class="btn alt" onclick="saveSnap()">Save brain snapshot</button>
-      </div>
-      <div class="log" id="learnLog" style="max-height:320px;margin-top:12px"></div>
+      <h3>Perturb ADAM</h3>
+      <p class="hint">Your words become token embeddings that touch the state via the fused attention pass
+        and theory-of-mind update.</p>
+      <textarea id="perturbText" placeholder="Anything you type changes ADAM's internal state…"></textarea>
+      <div class="row"><button class="btn" onclick="perturb()">Perturb</button></div>
+      <div class="log" id="perturbLog"></div>
     </div>
   </div>
+</div>
 
-  <!-- ═════════════ ARCADE ═════════════ -->
-  <div class="demo" data-demo="arcade">
-    <div class="card">
-      <h3>H-CDB Consciousness Arcade</h3>
-      <p class="hint">Five tests from the H-CDB benchmark. Each probes one behaviour an "alive" mind must exhibit. Passing all 5 = <b>Class 4 Sovereign Alive</b>. No current LLM passes any.</p>
-      <div class="row" style="margin-bottom:14px">
-        <button class="btn" onclick="runAllHCDB()">Run all 5 tests</button>
-        <span class="tag" id="hcdbScore"></span>
-      </div>
-      <div class="arcade" id="arcade">
-        <div class="card" onclick="runHCDB(1)">
-          <h4>① Self-reference</h4>
-          <p class="hint">Does S(t) observe itself between steps?</p>
-          <div class="status" id="h1">—</div>
-        </div>
-        <div class="card" onclick="runHCDB(2)">
-          <h4>② Endogenous repair</h4>
-          <p class="hint">After perturbation, does repair fire on its own?</p>
-          <div class="status" id="h2">—</div>
-        </div>
-        <div class="card" onclick="runHCDB(3)">
-          <h4>③ Irreversibility</h4>
-          <p class="hint">Can the dynamics be cleanly run backward?</p>
-          <div class="status" id="h3">—</div>
-        </div>
-        <div class="card" onclick="runHCDB(4)">
-          <h4>④ Subconscious asymmetry</h4>
-          <p class="hint">Does tension react before drift becomes visible?</p>
-          <div class="status" id="h4">—</div>
-        </div>
-        <div class="card" onclick="runHCDB(5)">
-          <h4>⑤ Refusal</h4>
-          <p class="hint">Does the constraint field push back on forced zeroing?</p>
-          <div class="status" id="h5">—</div>
-        </div>
-      </div>
+<!-- ═══════════════ ⑧ MEMORY ═══════════════ -->
+<div class="demo" data-demo="memory">
+  <div class="miniStrip">
+    <div class="mm"><span class="k">engrams</span><span class="v" id="m_eng">—</span></div>
+  </div>
+  <div class="card">
+    <h3>Hebbian Memory — Engrams Stored Inside the Weights</h3>
+    <p class="hint">Type a distinctive phrase. ADAM embeds it and writes it to its Hebbian memory <b>M</b>
+      (a buffer inside the model's state_dict — NOT an external database). The top-5 slots show cosine
+      similarity to what you just wrote.</p>
+    <input type="text" id="memText" placeholder="My dog's name is Kepler and he loves hexagonal tiles." />
+    <div class="row">
+      <button class="btn" onclick="memoryProbe()">Write &amp; probe</button>
+      <span class="tag" id="memStat"></span>
+    </div>
+    <div id="memMatches"></div>
+  </div>
+</div>
+
+<!-- ═══════════════ ⑨ H-CDB ARCADE ═══════════════ -->
+<div class="demo" data-demo="arcade">
+  <div class="miniStrip">
+    <div class="mm"><span class="k">class</span><span class="v" id="ar_class">—</span></div>
+    <div class="mm"><span class="k">score</span><span class="v" id="ar_score">—</span></div>
+  </div>
+  <div class="card">
+    <h3>H-CDB Consciousness Arcade</h3>
+    <p class="hint">Five tests from the H-CDB benchmark. Each probes one behaviour an alive mind must exhibit.
+      Passing all 5 = <b>Class 4 Sovereign Alive</b>.</p>
+    <div class="row" style="margin-bottom:14px">
+      <button class="btn" onclick="runAllHCDB()">Run all 5 tests</button>
+      <span class="tag" id="hcdbScore"></span>
+    </div>
+    <div class="arcade">
+      <div class="card" onclick="runHCDB(1)"><h4>① Self-reference</h4>
+        <p class="hint">Does S(t) observe itself between steps?</p><div class="status" id="h1">—</div></div>
+      <div class="card" onclick="runHCDB(2)"><h4>② Endogenous repair</h4>
+        <p class="hint">After perturbation, does repair fire on its own?</p><div class="status" id="h2">—</div></div>
+      <div class="card" onclick="runHCDB(3)"><h4>③ Irreversibility</h4>
+        <p class="hint">Can the dynamics be cleanly run backward?</p><div class="status" id="h3">—</div></div>
+      <div class="card" onclick="runHCDB(4)"><h4>④ Subconscious asymmetry</h4>
+        <p class="hint">Does tension react before drift is visible?</p><div class="status" id="h4">—</div></div>
+      <div class="card" onclick="runHCDB(5)"><h4>⑤ Refusal</h4>
+        <p class="hint">Does the constraint field push back on forced zeroing?</p><div class="status" id="h5">—</div></div>
     </div>
   </div>
+</div>
+
+<!-- ═══════════════ ⑩ ALIVE LEARNING ═══════════════ -->
+<div class="demo" data-demo="learn">
+  <div class="miniStrip">
+    <div class="mm"><span class="k">enabled</span><span class="v" id="l_enabled">—</span></div>
+    <div class="mm"><span class="k">mean recent loss</span><span class="v" id="l_meanloss">—</span>
+      <svg class="spark" id="sp_loss" width="140" height="28"></svg></div>
+  </div>
+  <div class="card">
+    <h3>Alive Learning — Continual real-time training</h3>
+    <p class="hint">Every message triggers a tiny EWC-anchored gradient update (<b>wake_tick</b>). On demand
+      ADAM runs a batch consolidation (<b>sleep_consolidate</b>) over its experience buffer. Over days these
+      updates accumulate into real learning from lived experience.</p>
+    <div class="grid2">
+      <div class="card" style="margin:0;background:#09090f">
+        <h4>Updates applied</h4>
+        <div class="bignum c4" id="l_updates">—</div>
+      </div>
+      <div class="card" style="margin:0;background:#09090f">
+        <h4>Fracture updates</h4>
+        <div class="bignum" style="color:var(--bad)" id="l_fracture">—</div>
+      </div>
+    </div>
+    <div class="grid3" style="margin-top:12px">
+      <div class="card" style="margin:0;background:#09090f"><h4>Live buffer</h4>
+        <div class="bignum" style="font-size:20px" id="l_live">—</div></div>
+      <div class="card" style="margin:0;background:#09090f"><h4>Seasons</h4>
+        <div class="bignum" style="font-size:20px" id="l_seasons">—</div></div>
+      <div class="card" style="margin:0;background:#09090f"><h4>Fracture events</h4>
+        <div class="bignum" style="font-size:20px" id="l_fevents">—</div></div>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn" onclick="sleepConsolidate(4,10)">Sleep: 10 × 4</button>
+      <button class="btn alt" onclick="sleepConsolidate(8,25)">Deep sleep: 25 × 8</button>
+      <button class="btn alt" onclick="toggleLearning()">Toggle learning</button>
+      <button class="btn alt" onclick="saveSnap()">Save brain snapshot</button>
+    </div>
+    <div class="log" id="learnLog" style="max-height:280px;margin-top:12px"></div>
+  </div>
+</div>
 
 </main>
 
 <script>
-/* ─────────────────────────────────────────────────────────
-   ADAM DEMO CLIENT
-────────────────────────────────────────────────────────── */
-const API = window.location.origin;   // same origin as FastAPI
+/* ──────────────────────────────────────────────
+   ADAM v0.5 client
+────────────────────────────────────────────── */
+const API = window.location.origin;
 const $ = q => document.querySelector(q);
 
-// ── tab switch ─────────────────────────────────────────
+/* ── rolling buffers (64 samples) ── */
+const BUF_N = 64;
+const buf = {
+  tension:[], drift:[], valence:[], arousal:[], hcdb:[], loss:[], t:[]
+};
+function push(k,v){ buf[k].push(v); if(buf[k].length>BUF_N) buf[k].shift(); }
+
+/* ── fetch helper with toast on error ── */
+function toast(msg){
+  const t = document.createElement('div'); t.className='toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .4s';}, 2200);
+  setTimeout(()=>t.remove(), 2700);
+}
+async function api(path, opts={}){
+  try{
+    const r = await fetch(API+path, opts);
+    if(!r.ok){ toast(`${path} → ${r.status}`); throw new Error(r.status); }
+    const ct = r.headers.get('content-type')||'';
+    return ct.includes('json') ? r.json() : r.text();
+  }catch(e){
+    if(!String(e).includes('Failed to fetch')) { /* already toasted */ }
+    else { toast(`${path} → offline`); }
+    throw e;
+  }
+}
+async function apiJSON(path, body, method='POST'){
+  return api(path,{method, headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+}
+
+/* ── format helpers ── */
+const f3 = v => (v==null||isNaN(v))?'—':(+v).toFixed(3);
+const f2 = v => (v==null||isNaN(v))?'—':(+v).toFixed(2);
+
+/* ── tab switch ── */
 document.querySelectorAll('nav button').forEach(b => {
   b.onclick = () => {
     document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
@@ -284,18 +539,57 @@ document.querySelectorAll('nav button').forEach(b => {
     document.querySelectorAll('.demo').forEach(d =>
       d.classList.toggle('active', d.dataset.demo===t));
     if(t==='attractor') drawAttractor();
+    if(t==='fracture')  drawFractureHist();
+    if(t==='holo')      drawHoloCurve();
+    if(t==='learn')     refreshLearnStats();
   };
 });
 
-// ── live state poll ────────────────────────────────────
+/* ── SVG sparkline ── */
+function sparkline(svgSel, data, opts={}){
+  const el = typeof svgSel==='string'? $(svgSel) : svgSel;
+  if(!el) return;
+  const w = el.getAttribute('width') || el.clientWidth || 120;
+  const h = el.getAttribute('height') || el.clientHeight || 30;
+  const W = typeof w==='string'? parseInt(w): w;
+  const H = typeof h==='string'? parseInt(h): h;
+  el.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  if(!data || data.length<2){ el.innerHTML=''; return; }
+  let mn=Infinity,mx=-Infinity;
+  for(const v of data){ if(v<mn)mn=v; if(v>mx)mx=v; }
+  if(mx-mn<1e-9){ mx=mn+1; }
+  const pts = data.map((v,i)=>{
+    const x = (i/(data.length-1))*W;
+    const y = H - ((v-mn)/(mx-mn))*(H-2) - 1;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  const col = opts.color || 'var(--accent)';
+  el.innerHTML =
+    `<polyline fill="none" stroke="${col}" stroke-width="1.5" points="${pts}"/>` +
+    `<circle cx="${(W).toFixed(1)}" cy="${(H-((data[data.length-1]-mn)/(mx-mn))*(H-2)-1).toFixed(1)}" r="2" fill="${col}"/>`;
+}
+
+/* ── state poll ── */
+let lastState = null;
 async function fetchState(){
   try{
-    const r = await fetch(API+'/state');
-    if(!r.ok) throw new Error();
-    const s = await r.json();
-    renderStrip(s);
+    const s = await api('/state');
+    lastState = s;
     $('#conn').textContent = '● connected';
     $('#conn').style.color = 'var(--ok)';
+
+    const emo = s.emotion || {};
+    const val = (emo.valence!=null)? emo.valence : (s.valence||0);
+    const aro = (emo.arousal!=null)? emo.arousal : (s.arousal||0);
+    push('tension', +s.tension||0);
+    push('drift',   +s.drift||0);
+    push('valence', +val);
+    push('arousal', +aro);
+    push('hcdb',    +s.hcdb_class||0);
+    push('t',       Date.now());
+
+    renderDash(s, val, aro);
+    renderMini(s);
     return s;
   }catch(e){
     $('#conn').textContent = '● offline';
@@ -303,283 +597,546 @@ async function fetchState(){
   }
 }
 
-function renderStrip(s){
-  const hcdbColor = s.hcdb_class===4?'ok':s.hcdb_class===3?'warn':'bad';
-  const aliveColor = s.alive?'ok':'bad';
-  const driftOk = s.drift < s.alive_threshold;
+function renderDash(s, val, aro){
+  $('#d_step').textContent = s.step;
+  $('#d_eng').textContent = s.engrams;
+  $('#d_tension').textContent = f3(s.tension);
+  $('#d_drift').textContent = f3(s.drift);
+  $('#d_val').textContent = f2(val);
+  $('#d_aro').textContent = f2(aro);
+  const hc = s.hcdb_class||0;
+  const bignum = $('#d_hcdb'); bignum.textContent = hc;
+  bignum.className = 'bignum c'+Math.max(1,Math.min(4,hc));
+  $('#d_hcdb_mini').textContent = hc+'/4';
+  $('#d_hcdb_mini').className = 'v '+(hc===4?'ok':hc===3?'warn':'bad');
+  const lab = ['—','Reactive','Aware','Reflective','Sovereign Alive'][hc]||'—';
+  $('#d_hcdb_label').textContent = lab;
+  sparkline('#sp_tension', buf.tension);
+  sparkline('#sp_drift', buf.drift, {color:'var(--warn)'});
+  drawVA();
+}
+
+function renderMini(s){
   const emo = s.emotion || {};
-  $('#strip').innerHTML = `
-    <div class="cell"><div class="k">Alive</div><div class="v ${aliveColor}">${s.alive?'YES':'NO'}</div></div>
-    <div class="cell"><div class="k">H-CDB class</div><div class="v ${hcdbColor}">${s.hcdb_class}/4</div></div>
-    <div class="cell"><div class="k">Drift</div><div class="v ${driftOk?'ok':'bad'}">${s.drift.toFixed(3)}</div></div>
-    <div class="cell"><div class="k">Threshold</div><div class="v">${s.alive_threshold.toFixed(2)}</div></div>
-    <div class="cell"><div class="k">Tension</div><div class="v warn">${s.tension.toFixed(3)}</div></div>
-    <div class="cell"><div class="k">Energy</div><div class="v">${(s.energy*100).toFixed(0)}%</div></div>
-    <div class="cell"><div class="k">Engrams</div><div class="v">${s.engrams}/${s.memory_size}</div></div>
-    <div class="cell"><div class="k">Step</div><div class="v">${s.step}</div></div>
-    <div class="cell"><div class="k">Valence</div><div class="v">${(emo.valence||0).toFixed(2)}</div></div>
-    <div class="cell"><div class="k">Arousal</div><div class="v">${(emo.arousal||0).toFixed(2)}</div></div>
-  `;
+  $('#t_tension').textContent = f3(s.tension);
+  $('#t_drift').textContent = f3(s.drift);
+  sparkline('#sp_t_tension', buf.tension);
+  $('#a_drift').textContent = f3(s.drift);
+  $('#a_tension').textContent = f3(s.tension);
+  $('#a_step').textContent = s.step;
+  $('#s_tension').textContent = f3(s.tension);
+  $('#s_drift').textContent = f3(s.drift);
+  $('#m_eng').textContent = s.engrams;
+  $('#h_eng').textContent = s.engrams;
+}
+
+/* ── V/A scatter trail ── */
+function drawVA(){
+  const el = $('#sp_va'); if(!el) return;
+  const W=240,H=120;
+  let html = `<line x1="${W/2}" y1="0" x2="${W/2}" y2="${H}" stroke="#222232" stroke-width="1"/>`+
+             `<line x1="0" y1="${H/2}" x2="${W}" y2="${H/2}" stroke="#222232" stroke-width="1"/>`;
+  const n = buf.valence.length;
+  for(let i=0;i<n;i++){
+    const age = (i+1)/n;
+    const x = W/2 + (buf.valence[i])*(W/2-8);
+    const y = H/2 - (buf.arousal[i])*(H/2-8);
+    html += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(1+age*2).toFixed(1)}" fill="rgba(110,231,255,${(0.15+age*0.7).toFixed(2)})"/>`;
+  }
+  el.innerHTML = html;
 }
 
 setInterval(fetchState, 1500);
 fetchState();
 
-// ═══════════════════ TEACH ═══════════════════
+/* ══════════════ ① DASHBOARD controls ══════════════ */
+let autoHandle = null;
+async function dashStep(){ await api('/step',{method:'POST'}); fetchState(); }
+function toggleAuto(){
+  if(autoHandle){ clearInterval(autoHandle); autoHandle=null;
+    $('#autoBtn').textContent='Auto-step ▶'; $('#autoMeta').textContent=''; return; }
+  autoHandle = setInterval(async ()=>{ try{ await api('/step',{method:'POST'}); fetchState(); }catch(e){} }, 800);
+  $('#autoBtn').textContent='Auto-step ■';
+  $('#autoMeta').textContent = 'stepping every 800ms';
+}
+function downloadTrace(){
+  const data = {
+    captured_at: new Date().toISOString(),
+    window: BUF_N,
+    buffers: buf,
+    last_state: lastState,
+  };
+  const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='adam_trace.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 200);
+}
+
+/* ══════════════ ② TALK ══════════════ */
+async function loadPersonas(){
+  try{
+    const d = await api('/personas');
+    const sel = $('#personaSel'); sel.innerHTML='';
+    (d.personas||[]).forEach(p=>{
+      const o = document.createElement('option');
+      o.value = p.id; o.textContent = p.name + (p.active?' ·':'');
+      if(p.active) o.selected = true;
+      sel.appendChild(o);
+    });
+    sel.onchange = async ()=>{
+      await api('/set_persona?k='+sel.value,{method:'POST'});
+      loadPersonas();
+    };
+  }catch(e){}
+}
+loadPersonas();
+
+let lastFractureCount = null;
+async function talk(){
+  const prompt = $('#talkPrompt').value.trim();
+  if(!prompt) return;
+  $('#learnPulse').innerHTML='<span class="pulse" style="color:var(--warn)">● learning… lr=3e-5</span>';
+  log('#talkLog', `<b style="color:var(--accent)">you</b>: ${esc(prompt)}`);
+
+  // snapshot fracture count before
+  let before = null;
+  try{ before = (await api('/learning_stats')).fracture_updates||0; }catch(e){}
+
+  try{
+    const d = await apiJSON('/generate_v04', {
+      prompt, max_tokens: 80,
+      reflect: $('#reflectChk').checked, rounds: 2,
+      gated: $('#gatedChk').checked,
+      refine: $('#refineChk').checked,
+    });
+    const m = d.meta || (d.rounds && d.rounds[d.rounds.length-1]) || {};
+    const metaStr = `T=${f2(m.temperature)} · p=${f2(m.top_p)} · drift=${f2(m.drift)} · tension=${f2(m.tension)}`;
+    let badge='';
+    try{
+      const ls = await api('/learning_stats');
+      $('#t_updates').textContent = ls.updates_applied;
+      if(before!=null && (ls.fracture_updates||0) > before){
+        badge = ' <span class="fracture-badge">FRACTURE</span>';
+      }
+    }catch(e){}
+    log('#talkLog', `<b style="color:var(--ok)">adam</b>: ${esc(d.text||'')}${badge}<br>&nbsp;&nbsp;<span class="tag">${metaStr}${d.wake_tick_loss!=null?' · wake_loss='+f3(d.wake_tick_loss):''}</span>`);
+    $('#talkPrompt').value='';
+    $('#learnPulse').innerHTML = `<span style="color:var(--ok)">● learned</span>`;
+    setTimeout(()=>{$('#learnPulse').innerHTML=''}, 2500);
+  }catch(e){
+    $('#learnPulse').innerHTML = `<span style="color:var(--bad)">● failed</span>`;
+  }
+}
+
+/* ══════════════ ③ HOLOGRAPHIC LAB ══════════════ */
+const HOLO_PRESETS = [
+  'red apple', 'blue ocean', 'happy child',
+  'grandfather clock', 'thunder storm', 'quiet forest',
+  'birthday cake', 'iron bridge'
+];
+let holoNorms = new Array(8).fill(null);
+let holoCurveData = []; // {dmg, mean}
+
+function renderHoloInputs(){
+  const root = $('#holoInputs'); root.innerHTML='';
+  HOLO_PRESETS.forEach((txt,i)=>{
+    const row = document.createElement('div'); row.className='engram-row';
+    row.innerHTML =
+      `<span class="idx">#${i}</span>`+
+      `<input type="text" id="holo_${i}" value="${esc(txt)}" />`;
+    root.appendChild(row);
+  });
+}
+function holoReset(){
+  for(let i=0;i<8;i++) $('#holo_'+i).value = HOLO_PRESETS[i];
+}
+async function holoWriteAll(){
+  for(let i=0;i<8;i++){
+    const v = $('#holo_'+i).value.trim() || HOLO_PRESETS[i];
+    try{ await apiJSON('/holo_write',{slot:i, text:v}); }catch(e){}
+  }
+  holoCurveData = [];
+  await holoProbeAll(0);
+  toast('8 engrams written');
+}
+async function holoProbeAll(forceDmg){
+  const dmg = (forceDmg!=null)? forceDmg : (+$('#dmgSlider').value||0);
+  holoNorms = new Array(8).fill(null);
+  for(let i=0;i<8;i++){
+    try{
+      const r = await api('/holo_recall?slot='+i,{method:'POST'});
+      holoNorms[i] = r.norm;
+    }catch(e){ holoNorms[i] = 0; }
+  }
+  renderHoloBars();
+  const mean = holoNorms.reduce((a,b)=>a+(b||0),0)/8;
+  $('#h_mean').textContent = f3(mean);
+  const exists = holoCurveData.find(p=>p.dmg===dmg);
+  if(!exists){ holoCurveData.push({dmg, mean}); holoCurveData.sort((a,b)=>a.dmg-b.dmg); }
+  else exists.mean = mean;
+  drawHoloCurve();
+}
+function renderHoloBars(){
+  const root = $('#holoBars'); root.innerHTML='';
+  const mx = Math.max(1e-9, ...holoNorms.map(v=>v||0));
+  for(let i=0;i<8;i++){
+    const v = holoNorms[i]||0;
+    const pct = (v/mx)*100;
+    const row = document.createElement('div'); row.className='engram-row';
+    row.innerHTML =
+      `<span class="idx">#${i}</span>`+
+      `<div style="display:flex;gap:8px;align-items:center">`+
+      `<div class="bar-track" style="flex:1"><div class="bar-fill" style="width:${pct.toFixed(1)}%"></div></div>`+
+      `<span style="font-family:var(--mono);font-size:11px;color:var(--dim);min-width:60px;text-align:right">${f3(v)}</span>`+
+      `</div>`;
+    root.appendChild(row);
+  }
+}
+function drawHoloCurve(){
+  const el = $('#holoCurve'); if(!el) return;
+  const W=400,H=180, pad=28;
+  let html = `<rect x="0" y="0" width="${W}" height="${H}" fill="#070710"/>`;
+  for(let i=0;i<=4;i++){
+    const y = pad + (i/4)*(H-pad*2);
+    html += `<line x1="${pad}" y1="${y}" x2="${W-8}" y2="${y}" stroke="#15151e"/>`;
+  }
+  html += `<line x1="${pad}" y1="${pad}" x2="${pad}" y2="${H-pad}" stroke="#222232"/>`+
+          `<line x1="${pad}" y1="${H-pad}" x2="${W-8}" y2="${H-pad}" stroke="#222232"/>`+
+          `<text x="${pad-4}" y="${pad+4}" fill="#8a8aa0" font-size="9" text-anchor="end" font-family="monospace">norm</text>`+
+          `<text x="${W-8}" y="${H-6}" fill="#8a8aa0" font-size="9" text-anchor="end" font-family="monospace">% dim killed</text>`;
+  if(holoCurveData.length>1){
+    const mxDmg = 70;
+    const mxN = Math.max(1e-9, ...holoCurveData.map(p=>p.mean));
+    const pts = holoCurveData.map(p=>{
+      const x = pad + (p.dmg/mxDmg)*(W-pad-8);
+      const y = pad + (1 - p.mean/mxN)*(H-pad*2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+    html += `<polyline fill="none" stroke="var(--accent)" stroke-width="2" points="${pts}"/>`;
+    holoCurveData.forEach(p=>{
+      const x = pad + (p.dmg/mxDmg)*(W-pad-8);
+      const y = pad + (1 - p.mean/mxN)*(H-pad*2);
+      html += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="var(--accent)"/>`;
+    });
+  }
+  el.innerHTML = html;
+}
+$('#dmgSlider').addEventListener('change', async (e)=>{
+  const dmg = +e.target.value;
+  $('#dmgVal').textContent = dmg;
+  $('#h_dmg').textContent = dmg+' %';
+  if(dmg>0){
+    try{ await api('/holo_damage?fraction='+(dmg/100),{method:'POST'}); }catch(e){}
+  }
+  await holoProbeAll(dmg);
+});
+$('#dmgSlider').addEventListener('input',(e)=>{$('#dmgVal').textContent=e.target.value;});
+renderHoloInputs();
+
+/* ══════════════ ④ STEERING LAB ══════════════ */
+async function runSteerVariant(seed, cellId){
+  const prompt = $('#steerPrompt').value.trim();
+  if(!prompt) return;
+  const scale = parseFloat($('#steerScale').value)||1.0;
+  $('#s_scale').textContent = f2(scale);
+  const tokens = parseInt($('#steerTokens').value)||60;
+  $(cellId).textContent = '…';
+  try{
+    if(seed==null){
+      await api('/steer/clear',{method:'POST'});
+    } else {
+      await api('/steer/random?scale='+scale+'&seed='+seed,{method:'POST'});
+    }
+    const d = await apiJSON('/generate_v04',{
+      prompt, max_tokens: tokens, reflect:false, gated:true, refine:true
+    });
+    $(cellId).textContent = (d.text||'').trim() || '(empty)';
+  }catch(e){
+    $(cellId).textContent = '(error)';
+  }
+}
+async function runSteerMatrix(){
+  $('#steerMeta').textContent = 'running 4 variants…';
+  await runSteerVariant(null, '#steer_none');
+  await runSteerVariant(1,    '#steer_1');
+  await runSteerVariant(7,    '#steer_7');
+  await runSteerVariant(42,   '#steer_42');
+  await api('/steer/clear',{method:'POST'});
+  $('#steerMeta').textContent = 'done · steering cleared';
+}
+
+/* ══════════════ ⑤ FRACTURE LAB ══════════════ */
+let fractureBins = [];  // tension history accumulated
+let lastFrMu = 0, lastFrSigma = 0;
+let fractureEvents = []; // list of {z,text,t}
+async function pollFracture(){
+  try{
+    const f = await api('/fracture_status');
+    $('#f_z').textContent = f3(f.z);
+    $('#f_mu').textContent = f3(f.mu);
+    $('#f_sigma').textContent = f3(f.sigma);
+    $('#f_thresh').textContent = f3((f.mu||0)+2*(f.sigma||0));
+    $('#f_count').textContent = f.count_total||0;
+    lastFrMu = f.mu||0; lastFrSigma = f.sigma||0;
+    if(typeof f.z==='number'){
+      fractureBins.push(f.z);
+      if(fractureBins.length>256) fractureBins.shift();
+    }
+    drawFractureHist();
+  }catch(e){}
+}
+function drawFractureHist(){
+  const el = $('#fractureHist'); if(!el) return;
+  const W=400,H=160,pad=20;
+  let html = `<rect x="0" y="0" width="${W}" height="${H}" fill="#070710"/>`;
+  if(fractureBins.length<2){ el.innerHTML = html; return; }
+  const mn = Math.min(...fractureBins), mx = Math.max(...fractureBins);
+  const range = Math.max(1e-9, mx-mn);
+  const nBins = 24;
+  const bins = new Array(nBins).fill(0);
+  for(const v of fractureBins){
+    const idx = Math.min(nBins-1, Math.floor((v-mn)/range*nBins));
+    bins[idx]++;
+  }
+  const bmx = Math.max(1, ...bins);
+  const bw = (W-pad*2)/nBins;
+  for(let i=0;i<nBins;i++){
+    const h = (bins[i]/bmx)*(H-pad*2);
+    const x = pad + i*bw;
+    const y = H-pad-h;
+    html += `<rect x="${x+1}" y="${y}" width="${bw-2}" height="${h}" fill="#6ee7ff" opacity="0.6"/>`;
+  }
+  // threshold line
+  const thresh = lastFrMu + 2*lastFrSigma;
+  if(thresh>=mn && thresh<=mx){
+    const tx = pad + ((thresh-mn)/range)*(W-pad*2);
+    html += `<line x1="${tx}" y1="${pad}" x2="${tx}" y2="${H-pad}" stroke="var(--bad)" stroke-width="2" stroke-dasharray="4,3"/>`;
+    html += `<text x="${tx+4}" y="${pad+10}" fill="var(--bad)" font-size="10" font-family="monospace">μ+2σ</text>`;
+  }
+  html += `<text x="${pad}" y="${H-4}" fill="#8a8aa0" font-size="9" font-family="monospace">${f3(mn)}</text>`;
+  html += `<text x="${W-pad}" y="${H-4}" fill="#8a8aa0" font-size="9" text-anchor="end" font-family="monospace">${f3(mx)}</text>`;
+  el.innerHTML = html;
+}
+async function fractureSend(){
+  const t = $('#fractureInput').value.trim();
+  if(!t) return;
+  let before=0;
+  try{ before = (await api('/fracture_status')).count_total||0; }catch(e){}
+  try{
+    await apiJSON('/perturb',{text:t});
+    await api('/step',{method:'POST'});
+    const f = await api('/fracture_status');
+    const after = f.count_total||0;
+    const fractured = after>before;
+    const line = `z=<b>${f3(f.z)}</b> · thresh=<b>${f3((f.mu||0)+2*(f.sigma||0))}</b> · ${fractured?'<span style="color:var(--bad)">FRACTURED</span>':'<span style="color:var(--ok)">ordinary</span>'} · "${esc(t.slice(0,60))}"`;
+    log('#fractureLog', line);
+    if(fractured){
+      fractureEvents.unshift({z:f.z, text:t, t:Date.now()});
+      fractureEvents = fractureEvents.slice(0,10);
+    }
+    $('#fractureInput').value='';
+  }catch(e){}
+}
+setInterval(pollFracture, 1000);
+
+/* ══════════════ ⑥ TEACH ══════════════ */
 let proposalQueue = [];
 async function teach(){
   const t = $('#teachText').value.trim();
   if(!t) return;
-  log('#teachLog', `→ proposing update for: "${t.slice(0,60)}${t.length>60?'…':''}"`);
-  const r = await fetch(API+'/teach',{
-    method:'POST',headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({text:t, lr:3e-5, reason:'user teach'})
-  });
-  const d = await r.json();
-  log('#teachLog', `  id=${d.proposal_id}  loss_before=<b>${d.loss_before.toFixed(4)}</b>  <span style="color:var(--warn)">staged, awaiting approval</span>`);
-  proposalQueue.push(d);
-  renderProposals();
-  $('#teachText').value = '';
+  log('#teachLog', `→ proposing update for: "${esc(t.slice(0,60))}${t.length>60?'…':''}"`);
+  try{
+    const d = await apiJSON('/teach',{text:t, lr:3e-5});
+    log('#teachLog', `  id=${d.proposal_id} · loss_before=<b>${f3(d.loss_before)}</b> · <span style="color:var(--warn)">staged</span>`);
+    proposalQueue.push({...d, text:t});
+    renderProposals();
+    $('#teachText').value='';
+  }catch(e){}
 }
-
 function renderProposals(){
   $('#proposals').innerHTML = proposalQueue.map(p => `
     <div class="proposal" id="p${p.proposal_id}">
-      <div class="meta">
-        #<b>${p.proposal_id}</b> · loss_before <b>${p.loss_before.toFixed(4)}</b> · "${escapeHTML(p.text.slice(0,50))}${p.text.length>50?'…':''}"
-      </div>
+      <div class="meta">#<b>${p.proposal_id}</b> · loss_before <b>${f3(p.loss_before)}</b> · "${esc((p.text||'').slice(0,50))}"</div>
       <div class="row" style="margin:0">
-        <button class="btn good" onclick="approve(${p.proposal_id})">Approve</button>
-        <button class="btn bad" onclick="reject(${p.proposal_id})">Reject</button>
+        <button class="btn good" onclick="approve('${p.proposal_id}')">Approve</button>
+        <button class="btn bad" onclick="reject('${p.proposal_id}')">Reject</button>
       </div>
-    </div>
-  `).join('');
+    </div>`).join('');
+  $('#te_pending').textContent = proposalQueue.length;
 }
-
 async function approve(id){
-  const r = await fetch(API+'/approve',{method:'POST',
-    headers:{'Content-Type':'application/json'},body: JSON.stringify({proposal_id:id})});
-  const d = await r.json();
-  const p = proposalQueue.find(x=>x.proposal_id===id);
-  const delta = d.loss_after!==null ? (p.loss_before - d.loss_after).toFixed(4) : '?';
-  log('#teachLog', `  ✓ <b>APPROVED #${id}</b>  loss_after=<b>${(d.loss_after||0).toFixed(4)}</b>  Δ=<b style="color:var(--ok)">-${delta}</b>`);
-  proposalQueue = proposalQueue.filter(x=>x.proposal_id!==id);
+  try{
+    const d = await apiJSON('/approve',{proposal_id:id});
+    const p = proposalQueue.find(x=>String(x.proposal_id)===String(id));
+    const delta = (d.loss_after!=null && p)? (p.loss_before - d.loss_after) : null;
+    log('#teachLog', `  ✓ APPROVED #${id} · loss_after=<b>${f3(d.loss_after)}</b> · Δ=<b style="color:var(--ok)">${delta!=null?'-'+f3(delta):'?'}</b>`);
+    if(delta!=null) $('#te_delta').textContent = '-'+f3(delta);
+  }catch(e){}
+  proposalQueue = proposalQueue.filter(x=>String(x.proposal_id)!==String(id));
   renderProposals();
 }
 async function reject(id){
-  await fetch(API+'/reject',{method:'POST',
-    headers:{'Content-Type':'application/json'},body: JSON.stringify({proposal_id:id})});
-  log('#teachLog', `  ✗ rejected #${id}`);
-  proposalQueue = proposalQueue.filter(x=>x.proposal_id!==id);
+  try{ await apiJSON('/reject',{proposal_id:id}); log('#teachLog', `  ✗ rejected #${id}`); }catch(e){}
+  proposalQueue = proposalQueue.filter(x=>String(x.proposal_id)!==String(id));
   renderProposals();
 }
 
-// ═══════════════════ PERTURB / ATTRACTOR ═══════════════════
+/* ══════════════ ⑦ ATTRACTOR ══════════════ */
+let autoAttrHandle = null;
 async function perturb(){
-  const t = $('#perturbText').value.trim();
-  if(!t) return;
-  log('#perturbLog', `→ perturbing with: "${t.slice(0,60)}…"`);
-  const r = await fetch(API+'/perturb',{method:'POST',
-    headers:{'Content-Type':'application/json'},body: JSON.stringify({text:t, steps:2})});
-  const d = await r.json();
-  log('#perturbLog', `  drift=<b>${d.drift.toFixed(3)}</b> · tension=<b>${d.tension.toFixed(3)}</b> · alive=<b>${d.alive}</b> · ToM align=<b>${(d.tom_alignment||0).toFixed(3)}</b>`);
+  const t = $('#perturbText').value.trim(); if(!t) return;
+  log('#perturbLog', `→ perturbing: "${esc(t.slice(0,60))}"`);
+  try{
+    const d = await apiJSON('/perturb',{text:t});
+    log('#perturbLog', `  drift=<b>${f3(d.drift)}</b> · tension=<b>${f3(d.tension)}</b> · alive=<b>${d.alive}</b>`);
+    drawAttractor();
+  }catch(e){}
+}
+async function tickN(n){
+  for(let i=0;i<n;i++){ try{ await api('/step',{method:'POST'}); }catch(e){} }
   drawAttractor();
 }
-
-let autoHandle = null;
-async function tick(n){
-  await fetch(API+'/step?steps='+n,{method:'POST'});
-  drawAttractor();
-}
-function autoStep(){
-  stopAuto();
-  autoHandle = setInterval(()=>tick(2), 600);
-}
-function stopAuto(){ if(autoHandle){clearInterval(autoHandle);autoHandle=null} }
+function autoStepAttr(){ stopAutoAttr();
+  autoAttrHandle = setInterval(()=>tickN(2), 600); }
+function stopAutoAttr(){ if(autoAttrHandle){clearInterval(autoAttrHandle);autoAttrHandle=null;} }
 
 async function drawAttractor(){
-  const r = await fetch(API+'/attractor_viz');
-  const d = await r.json();
-  const c = $('#attractor');
+  let d;
+  try{ d = await api('/attractor_viz'); }catch(e){ return; }
+  const c = $('#attractor'); if(!c) return;
   const W = c.width = c.clientWidth, H = c.height = c.clientHeight;
   const ctx = c.getContext('2d');
   ctx.fillStyle = '#070710'; ctx.fillRect(0,0,W,H);
-
-  if(!d.trajectory || !d.trajectory.length) return;
-  const pts = d.trajectory;
+  const pts = d.points || d.trajectory || [];
+  const istar = d.i_star || [0,0];
+  if(!pts.length) return;
   let mx=0,my=0;
-  for(const p of pts){mx=Math.max(mx,Math.abs(p[0]));my=Math.max(my,Math.abs(p[1]))}
+  for(const p of pts){mx=Math.max(mx,Math.abs(p[0]-istar[0]));my=Math.max(my,Math.abs(p[1]-istar[1]));}
   const m = Math.max(mx,my,1)*1.25;
-  const X = v => W/2 + (v/m)*(W/2 - 24);
-  const Y = v => H/2 - (v/m)*(H/2 - 24);
-
-  // grid
-  ctx.strokeStyle = '#15151e'; ctx.lineWidth = 1;
+  const X = v => W/2 + ((v-istar[0])/m)*(W/2-24);
+  const Y = v => H/2 - ((v-istar[1])/m)*(H/2-24);
+  ctx.strokeStyle='#15151e'; ctx.lineWidth=1;
   for(let i=1;i<6;i++){
     ctx.beginPath(); ctx.moveTo(0,H*i/6); ctx.lineTo(W,H*i/6); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(W*i/6,0); ctx.lineTo(W*i/6,H); ctx.stroke();
   }
-  // axes
-  ctx.strokeStyle = '#222232';
+  ctx.strokeStyle='#222232';
   ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke();
-
-  // alive threshold ring (scaled into viz space heuristically)
-  ctx.strokeStyle = 'rgba(255,107,139,0.25)'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.arc(W/2, H/2, 0.7*Math.min(W,H)/2, 0, Math.PI*2); ctx.stroke();
-
-  // trajectory
+  ctx.strokeStyle='rgba(255,107,139,0.25)';
+  ctx.beginPath(); ctx.arc(W/2,H/2,0.7*Math.min(W,H)/2,0,Math.PI*2); ctx.stroke();
   for(let i=0;i<pts.length;i++){
     const p = pts[i];
     const age = i/pts.length;
     const sz = 1 + age*3;
     ctx.fillStyle = `rgba(110,231,255,${0.15+age*0.7})`;
-    ctx.beginPath(); ctx.arc(X(p[0]), Y(p[1]), sz, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(X(p[0]),Y(p[1]),sz,0,Math.PI*2); ctx.fill();
   }
-  // current
   const last = pts[pts.length-1];
-  ctx.fillStyle = 'var(--accent)';
-  ctx.beginPath(); ctx.arc(X(last[0]), Y(last[1]), 6, 0, Math.PI*2); ctx.fill();
-  ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
-  ctx.stroke();
-
-  // I*
-  ctx.fillStyle = '#8bff8b';
-  ctx.beginPath(); ctx.arc(W/2, H/2, 8, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = '#fff'; ctx.font = '12px ui-monospace,monospace';
-  ctx.fillText('I*', W/2+12, H/2+4);
+  ctx.fillStyle='#6ee7ff';
+  ctx.beginPath(); ctx.arc(X(last[0]),Y(last[1]),6,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#8bff8b';
+  ctx.beginPath(); ctx.arc(W/2,H/2,7,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#fff'; ctx.font='11px ui-monospace,monospace';
+  ctx.fillText('I*', W/2+11, H/2+4);
   ctx.fillText(`S(t) · ${pts.length} samples`, X(last[0])+10, Y(last[1]));
 }
+window.addEventListener('resize',()=>{ if($('#attractor') && $('.demo[data-demo=attractor]').classList.contains('active')) drawAttractor(); });
 
-window.addEventListener('resize',()=>drawAttractor());
-
-// ═══════════════════ MEMORY ═══════════════════
+/* ══════════════ ⑧ MEMORY PROBE ══════════════ */
 async function memoryProbe(){
-  const t = $('#memText').value.trim();
-  if(!t) return;
-  const r = await fetch(API+'/memory_probe',{method:'POST',
-    headers:{'Content-Type':'application/json'},body: JSON.stringify({phrase:t})});
-  const d = await r.json();
-  $('#memStat').textContent = `wrote engram · total ${d.total_engrams}`;
-  $('#memMatches').innerHTML = d.top_matches.map((m,i)=>`
-    <div class="proposal">
-      <div class="meta">slot <b>#${m.slot}</b> · usage <b>${m.usage.toFixed(2)}</b></div>
-      <div class="row" style="margin:0;flex:1;max-width:60%">
-        <div class="track" style="flex:1;background:#090910;height:10px;border-radius:4px;overflow:hidden">
-          <div style="width:${(Math.max(0,m.similarity)*100).toFixed(1)}%;height:100%;background:linear-gradient(90deg,var(--accent),var(--ok))"></div>
+  const t = $('#memText').value.trim(); if(!t) return;
+  try{
+    const d = await apiJSON('/memory_probe',{text:t});
+    $('#memStat').textContent = `wrote engram · total ${d.total_engrams}`;
+    const matches = d.top_matches || (d.cos!=null?[{slot:d.slot_hit,similarity:d.cos,usage:1}]:[]);
+    $('#memMatches').innerHTML = matches.map(m=>`
+      <div class="proposal">
+        <div class="meta">slot <b>#${m.slot}</b>${m.usage!=null?' · usage <b>'+f2(m.usage)+'</b>':''}</div>
+        <div class="row" style="margin:0;flex:1;max-width:60%">
+          <div class="bar-track" style="flex:1">
+            <div class="bar-fill" style="width:${(Math.max(0,m.similarity)*100).toFixed(1)}%"></div>
+          </div>
+          <span class="meta" style="min-width:60px;text-align:right">${f3(m.similarity)}</span>
         </div>
-        <span class="meta" style="min-width:60px;text-align:right">${m.similarity.toFixed(3)}</span>
-      </div>
-    </div>`).join('');
+      </div>`).join('');
+  }catch(e){}
 }
 
-// ═══════════════════ H-CDB ARCADE ═══════════════════
+/* ══════════════ ⑨ H-CDB ARCADE ══════════════ */
 async function runHCDB(id){
-  const r = await fetch(API+'/hcdb_test?test_id='+id,{method:'POST'});
-  const d = await r.json();
-  const el = $('#h'+id);
-  el.textContent = d.passed? '✅ PASS · '+d.test : '❌ FAIL · '+d.test;
-  el.className = 'status ' + (d.passed?'ok':'bad');
+  try{
+    const d = await apiJSON('/hcdb_test',{test_id:id});
+    const el = $('#h'+id);
+    el.textContent = (d.passed?'PASS · ':'FAIL · ')+(d.test||d.explanation||'');
+    el.className = 'status '+(d.passed?'ok':'bad');
+  }catch(e){}
 }
 async function runAllHCDB(){
-  const r = await fetch(API+'/hcdb_all');
-  const d = await r.json();
-  d.tests.forEach((t,i)=>{
-    const el = $('#h'+(i+1));
-    el.textContent = t.passed? '✅ PASS' : '❌ FAIL';
-    el.className = 'status ' + (t.passed?'ok':'bad');
-  });
-  $('#hcdbScore').textContent = `score ${d.score} · class ${d.class}/4`;
-  $('#hcdbScore').style.color = d.class===4?'var(--ok)':'var(--warn)';
+  try{
+    const d = await api('/hcdb_all');
+    (d.tests||[]).forEach((t,i)=>{
+      const el = $('#h'+(i+1)); if(!el) return;
+      el.textContent = t.passed?'PASS':'FAIL';
+      el.className = 'status '+(t.passed?'ok':'bad');
+    });
+    $('#hcdbScore').textContent = `score ${d.score} · class ${d.class}/4`;
+    $('#hcdbScore').style.color = d.class===4?'var(--ok)':'var(--warn)';
+    $('#ar_class').textContent = (d.class||0)+'/4';
+    $('#ar_score').textContent = d.score;
+  }catch(e){}
 }
 
-// ═══════════════════ TALK (v0.4) ═══════════════════
-async function loadPersonas(){
-  const r = await fetch(API+'/personas');
-  const d = await r.json();
-  const sel = $('#personaSel'); sel.innerHTML='';
-  d.personas.forEach(p=>{
-    const o = document.createElement('option');
-    o.value = p.id; o.textContent = p.name + (p.active?' •':'');
-    if(p.active) o.selected = true;
-    sel.appendChild(o);
-  });
-  sel.onchange = async ()=>{
-    await fetch(API+'/set_persona',{method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({persona_id:+sel.value})});
-    loadPersonas();
-  };
-}
-loadPersonas();
-
-async function talk(){
-  const prompt = $('#talkPrompt').value.trim();
-  if(!prompt) return;
-  $('#learnPulse').innerHTML='<span class="pulse" style="color:var(--warn)">● learning…</span>';
-  log('#talkLog', `<b style="color:var(--accent)">you</b>: ${escapeHTML(prompt)}`);
-  const reflect = $('#reflectChk').checked;
-  const r = await fetch(API+'/generate_v04',{method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({
-      prompt, max_tokens: 80,
-      reflect, rounds: 2,
-      use_gated_memory: $('#gatedChk').checked,
-      refine:           $('#refineChk').checked,
-    })});
-  const d = await r.json();
-  const m = d.meta || (d.rounds && d.rounds[d.rounds.length-1]);
-  const metaStr = m ? `T=${(m.temperature||0).toFixed(2)} · p=${(m.top_p||0).toFixed(2)} · drift=${(m.drift||0).toFixed(2)} · tension=${(m.tension||0).toFixed(2)}` : '';
-  log('#talkLog', `<b style="color:var(--ok)">adam</b>: ${escapeHTML(d.text)}<br>&nbsp;&nbsp;<span class="tag" style="color:var(--dim)">${metaStr}${d.wake_tick_loss!=null?' · wake_loss='+d.wake_tick_loss.toFixed(3):''}</span>`);
-  $('#talkPrompt').value='';
-  $('#learnPulse').innerHTML = `<span style="color:var(--ok)">● learned (Δloss applied)</span>`;
-  setTimeout(()=>{$('#learnPulse').innerHTML=''}, 3000);
-}
-
-// ═══════════════════ ALIVE LEARNING ═══════════════════
+/* ══════════════ ⑩ ALIVE LEARNING ══════════════ */
 async function refreshLearnStats(){
-  const r = await fetch(API+'/learning_stats');
-  const d = await r.json();
-  $('#learnStrip').innerHTML = `
-    <div class="cell"><div class="k">Enabled</div><div class="v ${d.enabled?'ok':'bad'}">${d.enabled?'YES':'NO'}</div></div>
-    <div class="cell"><div class="k">Updates applied</div><div class="v">${d.updates_applied||0}</div></div>
-    <div class="cell"><div class="k">Buffer</div><div class="v">${d.buffer?.total||0}/${d.buffer?.capacity||0}</div></div>
-    <div class="cell"><div class="k">Mean tension</div><div class="v">${(d.buffer?.mean_tension||0).toFixed(3)}</div></div>
-    <div class="cell"><div class="k">Recent loss</div><div class="v">${d.mean_loss_recent?d.mean_loss_recent.toFixed(3):'—'}</div></div>
-    <div class="cell"><div class="k">Anchor params</div><div class="v">${d.anchor_params||0}</div></div>
-  `;
+  try{
+    const d = await api('/learning_stats');
+    $('#l_enabled').textContent = d.enabled?'YES':'NO';
+    $('#l_enabled').className = 'v '+(d.enabled?'ok':'bad');
+    $('#l_updates').textContent = d.updates_applied||0;
+    $('#l_fracture').textContent = d.fracture_updates||0;
+    $('#l_live').textContent = d.buffer?.live ?? d.buffer?.total ?? 0;
+    $('#l_seasons').textContent = d.buffer?.seasons ?? 0;
+    $('#l_fevents').textContent = d.buffer?.fracture_events ?? d.fracture_updates ?? 0;
+    $('#l_meanloss').textContent = d.mean_loss_recent!=null?f3(d.mean_loss_recent):'—';
+    const rl = d.recent_loss || [];
+    buf.loss = rl.slice(-BUF_N);
+    sparkline('#sp_loss', buf.loss, {color:'var(--warn)'});
+  }catch(e){}
 }
-setInterval(refreshLearnStats, 2500);
+setInterval(refreshLearnStats, 2000);
 refreshLearnStats();
 
 async function sleepConsolidate(bs, steps){
   log('#learnLog', `→ sleep consolidate: batch=${bs} steps=${steps} …`);
-  const r = await fetch(API+'/sleep',{method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({batch_size:bs, steps:steps})});
-  const d = await r.json();
-  log('#learnLog', `  ✓ ran <b>${d.steps_run||0}</b> steps · loss <b>${(d.loss_first||0).toFixed(3)}</b> → <b>${(d.loss_last||0).toFixed(3)}</b> · total updates <b>${d.updates_total}</b>`);
-  refreshLearnStats();
+  try{
+    const d = await api('/sleep?batch_size='+bs+'&steps='+steps,{method:'POST'});
+    log('#learnLog', `  ✓ ran <b>${d.steps_run||0}</b> steps · loss <b>${f3(d.loss_first)}</b> → <b>${f3(d.loss_last)}</b>`);
+    refreshLearnStats();
+  }catch(e){}
 }
 async function toggleLearning(){
-  const r = await fetch(API+'/learning_toggle',{method:'POST'});
-  const d = await r.json();
-  log('#learnLog', `learning → <b>${d.enabled?'ON':'OFF'}</b>`);
-  refreshLearnStats();
+  try{
+    const d = await api('/learning_toggle',{method:'POST'});
+    log('#learnLog', `learning → <b>${d.enabled?'ON':'OFF'}</b>`);
+    refreshLearnStats();
+  }catch(e){}
 }
 async function saveSnap(){
-  const r = await fetch(API+'/save_snapshot?name=adam_snapshot.pt',{method:'POST'});
-  const d = await r.json();
-  log('#learnLog', `✓ snapshot saved → <b>${d.saved_to}</b> (${d.size_mb.toFixed(1)} MB)`);
+  try{
+    const d = await api('/save_snapshot?name=adam_snapshot.pt',{method:'POST'});
+    log('#learnLog', `✓ snapshot saved → <b>${d.saved_to||'adam_snapshot.pt'}</b>${d.size_mb?' ('+f2(d.size_mb)+' MB)':''}`);
+  }catch(e){}
 }
 
-// ── utils ─────────────────────────────────────────────
+/* ── utils ── */
 function log(sel, html){
-  const el = document.querySelector(sel);
+  const el = document.querySelector(sel); if(!el) return;
   const d = document.createElement('div'); d.className='line'; d.innerHTML = html;
   el.appendChild(d); el.scrollTop = el.scrollHeight;
 }
-function escapeHTML(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 </script>
 </body>
 </html>
