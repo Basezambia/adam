@@ -1,8 +1,32 @@
-# ADAM — A Dynamical Alive Mind
+# ADAM — A Dynamical Alive Mind  · v0.4 "The Alive Learner"
 
 > The first transformer architecture with brain-like persistent memory,
-> constraint-based identity, live emotion state, and inference-time
-> continual learning — all inside a single `state_dict`.
+> constraint-based identity, live emotion state, and **real-time continual
+> learning from every interaction** — all inside a single `state_dict`.
+
+## What's new in v0.4 (no retraining, no extra params)
+
+**10 inference-time upgrades** on top of the trained v0.3 checkpoint:
+
+1. **Reflection loop** — test-time self-correction through S(t)
+2. **Retrieval-gated memory** — cosine-weighted M rows in fused attention
+3. **Best-of-N trajectory** — pick the lowest-drift thought path
+4. **Adaptive temperature from tension** — cooler when uncertain
+5. **KV-cache for memory prefix** — 3-5× faster generation
+6. **RK4 state dynamics** — 4th-order Runge-Kutta integration
+7. **Surprise-gated Hebbian writes** — memory fires on tension spikes
+8. **Multi-persona identity bank** — k attractors, one checkpoint
+9. **Inference-time S(t) refinement** — sharpen state pre-token
+10. **Consciousness-conditioned top-p** — decoding adapts to H-CDB class
+
+Plus an **Alive Learning** system:
+
+- `ExperienceBuffer` — every message logged to `experience.jsonl` (20K cap)
+- `ContinualLearner.wake_tick(text)` — tiny EWC-anchored update per message
+- `ContinualLearner.sleep_consolidate()` — batch replay, like human sleep
+- Anchored to pre-trained weights with Elastic Weight Consolidation — no
+  catastrophic forgetting even across thousands of updates.
+
 
 [![Paper](https://img.shields.io/badge/paper-live-blue)](https://fused-consciousness-paper.vercel.app)
 [![Chat demo](https://img.shields.io/badge/chat-demo-green)](https://adamchat.vercel.app)

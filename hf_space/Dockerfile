@@ -12,7 +12,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source
-COPY adam.py demo_server.py ./
+COPY adam.py adam_v04.py demo_server.py ./
 COPY demo/ ./demo/
 
 # Checkpoint is downloaded at startup (see demo_server.py)
