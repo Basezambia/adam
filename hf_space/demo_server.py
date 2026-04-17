@@ -35,8 +35,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from adam import ADAM, AdamConfig
-from adam_v04 import ADAMv04, ExperienceBuffer, ContinualLearner
+from adam import (ADAM, AdamConfig,
+                  SeasonalExperienceBuffer, ExperienceBuffer,
+                  ContinualLearner)
+from adam_v04 import ADAMv04
 
 # ── globals ────────────────────────────────────────────────────────────
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -89,7 +91,8 @@ def load_adam(checkpoint='adam_checkpoint.pt'):
         print("[v04] adding personas: curious, calm")
         WRAP.add_persona('curious', steps=300)
         WRAP.add_persona('calm',    steps=300)
-    BUFFER = ExperienceBuffer(path='experience.jsonl', capacity=20000)
+    BUFFER = SeasonalExperienceBuffer(path='experience.jsonl',
+                                       season_size=500, keep_per_season=64)
     LEARNER = ContinualLearner(MODEL, BUFFER,
                                 wake_lr=3e-7, sleep_lr=1.5e-6,
                                 ewc_weight=0.03, enabled=LEARNING_ENABLED)
@@ -467,6 +470,100 @@ def save_snapshot(name: str = "adam_snapshot.pt"):
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
     LEARNER.save_snapshot(path)
     return {"saved_to": path, "size_mb": os.path.getsize(path) / 1e6}
+
+
+# ══════════════════════════════════════════════════════════════════════
+#  v0.5 — core-fused features: steering, holographic memory, fracture
+# ══════════════════════════════════════════════════════════════════════
+
+class SteerReq(BaseModel):
+    direction: List[float]     # length n_embd (or shorter, auto-truncated)
+    scale: float = 1.0
+    layers: Optional[List[int]] = None
+
+
+@app.post("/steer")
+def steer(req: SteerReq):
+    """Arm the activation-steering vector. Zero scale to disable."""
+    if not req.direction:
+        MODEL.clear_steer()
+        return {"armed": False}
+    d = torch.tensor(req.direction, dtype=torch.float32, device=MODEL.device)
+    MODEL.set_steer(d, scale=float(req.scale), layers=req.layers)
+    return {"armed": True, "scale": float(req.scale),
+            "layers": [int(i) for i, v in enumerate(MODEL.steer_layer_mask)
+                       if bool(v.item())]}
+
+
+@app.post("/steer/clear")
+def steer_clear():
+    MODEL.clear_steer()
+    return {"armed": False}
+
+
+@app.post("/steer/random")
+def steer_random(scale: float = 1.0, seed: int = 0):
+    """Pick a random steering direction (for demos). Reproducible via seed."""
+    g = torch.Generator(device='cpu').manual_seed(seed)
+    d = torch.randn(MODEL.cfg.n_embd, generator=g).to(MODEL.device)
+    MODEL.set_steer(d, scale=scale)
+    return {"armed": True, "scale": scale, "seed": seed}
+
+
+@app.get("/fracture_status")
+def fracture_status():
+    fr = MODEL.fracture_check()
+    fr['count_total'] = int(MODEL.fracture_count.item())
+    return fr
+
+
+class HoloReq(BaseModel):
+    slot: int
+    text: str
+
+
+@app.post("/holo_write")
+def holo_write(req: HoloReq):
+    """Write a text's embedding into the holographic memory register."""
+    if ENC is None or MODEL.memory is None:
+        return {"error": "tiktoken or memory unavailable"}
+    ids = ENC.encode_ordinary(req.text)[:64]
+    if not ids:
+        return {"error": "empty text"}
+    with torch.no_grad():
+        emb = MODEL.wte(torch.tensor(ids, device=MODEL.device)).mean(0)
+    MODEL.memory.write_holo(req.slot, emb)
+    return {"ok": True, "slot": req.slot,
+            "holo_norm": float(MODEL.memory.M_holo.norm().item()),
+            "holo_writes": int(MODEL.memory.holo_writes.item())}
+
+
+@app.post("/holo_recall")
+def holo_recall(slot: int = 0):
+    if MODEL.memory is None:
+        return {"error": "memory unavailable"}
+    v = MODEL.memory.recall_holo(slot)
+    return {"slot": slot, "norm": float(v.norm().item()),
+            "first8": v[:8].cpu().tolist()}
+
+
+@app.post("/holo_damage")
+def holo_damage(fraction: float = 0.3):
+    """Zero out `fraction` of dims in M_holo (fault tolerance test)."""
+    if MODEL.memory is None:
+        return {"error": "memory unavailable"}
+    before = float(MODEL.memory.M_holo.norm().item())
+    MODEL.memory.damage_holo(fraction)
+    after = float(MODEL.memory.M_holo.norm().item())
+    return {"fraction_killed": fraction, "norm_before": before,
+            "norm_after": after}
+
+
+@app.get("/season/{idx}")
+def season(idx: int):
+    if not isinstance(BUFFER, SeasonalExperienceBuffer):
+        return {"error": "seasonal buffer not in use"}
+    return {"season": idx, "records": BUFFER.from_season(idx)}
 
 
 @app.get("/hcdb_all")

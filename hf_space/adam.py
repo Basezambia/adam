@@ -125,6 +125,18 @@ class HebbianMemory(nn.Module):
         # A separate learned position embedding for memory slots
         self.pos_emb = nn.Embedding(self.K, self.d)
 
+        # ── Holographic (HRR) parallel register ──
+        # A single bag-of-bindings vector. bind(k,v) via circular convolution,
+        # bundle into bag by addition. Recall(k) ≈ v by unbind (circular
+        # correlation). Survives up to ~30% dim zeroing with graceful decay.
+        self.register_buffer('M_holo', torch.zeros(self.d))
+        self.register_buffer('holo_writes', torch.zeros(1, dtype=torch.long))
+        # Fixed random key basis for symbolic addressing (reproducible)
+        g = torch.Generator().manual_seed(1729)
+        keys = torch.randn(self.K, self.d, generator=g)
+        keys = F.normalize(keys, dim=1)
+        self.register_buffer('holo_keys', keys)
+
     def tokens(self, batch_size: int, device=None) -> torch.Tensor:
         """Return memory contents as (B, K, d) for prepending to a sequence."""
         if device is None:
@@ -163,10 +175,51 @@ class HebbianMemory(nn.Module):
         self.age[idx] = 0.0
         self.write_counter += 1
 
+    # ── HRR operations (circular convolution / correlation via FFT) ──
+    @staticmethod
+    def _bind(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+        """Circular convolution: a ⊛ b. Used to bind key↔value."""
+        return torch.fft.irfft(torch.fft.rfft(a) * torch.fft.rfft(b), n=a.shape[-1])
+
+    @staticmethod
+    def _unbind(c: torch.Tensor, a: torch.Tensor) -> torch.Tensor:
+        """Circular correlation: c ⊛ a*. Inverse of bind w.r.t. a."""
+        A = torch.fft.rfft(a)
+        # Involution (time-reverse) equivalent: conj in frequency domain
+        return torch.fft.irfft(torch.fft.rfft(c) * A.conj(), n=c.shape[-1])
+
+    @torch.no_grad()
+    def write_holo(self, slot_idx: int, value: torch.Tensor):
+        """Bind value to key[slot_idx] and bundle into holographic register."""
+        v = value.detach().flatten()[:self.d].to(self.M_holo.device)
+        v = v / (v.norm() + 1e-6)
+        k = self.holo_keys[slot_idx % self.K]
+        bound = self._bind(k, v)
+        # Bundle with slow decay so old memories fade gracefully (not deleted)
+        self.M_holo.mul_(0.995).add_(bound)
+        self.holo_writes += 1
+
+    @torch.no_grad()
+    def recall_holo(self, slot_idx: int) -> torch.Tensor:
+        """Unbind key[slot_idx] from holographic register → noisy value estimate."""
+        k = self.holo_keys[slot_idx % self.K]
+        v_hat = self._unbind(self.M_holo, k)
+        return v_hat / (v_hat.norm() + 1e-6)
+
+    @torch.no_grad()
+    def damage_holo(self, fraction: float):
+        """Zero out `fraction` of dims in M_holo — simulates node death."""
+        d = self.M_holo.numel()
+        n_kill = int(d * fraction)
+        idx = torch.randperm(d, device=self.M_holo.device)[:n_kill]
+        self.M_holo[idx] = 0.0
+
     def stats(self) -> Dict:
         return {
             'size': self.K,
             'writes': int(self.write_counter.item()),
+            'holo_writes': int(self.holo_writes.item()),
+            'holo_norm': float(self.M_holo.norm().item()),
             'mean_usage': float(self.usage.mean().item()),
             'max_usage': float(self.usage.max().item()),
             'saturation': float((self.usage > 0.5).float().mean().item()),
@@ -491,9 +544,13 @@ class FusedBlock(nn.Module):
         self.ln_2 = LayerNorm(cfg.n_embd, bias=cfg.bias)
         self.mlp = FusedMLP(cfg)
 
-    def forward(self, x, mem_size=0, state_pos=None):
+    def forward(self, x, mem_size=0, state_pos=None, steer=None):
         x = x + self.attn(self.ln_1(x), mem_size=mem_size, state_pos=state_pos)
         x = x + self.mlp(self.ln_2(x))
+        # Activation steering: add a control direction to the residual stream.
+        # Zero vector = no steering. Applied post-block so it accumulates.
+        if steer is not None:
+            x = x + steer
         return x
 
 
@@ -610,6 +667,23 @@ class ADAM(nn.Module):
         # Energy
         self._energy = 1.0
 
+        # ── Steering vector (activation steering at residual stream) ──
+        # Zero by default → no effect. set_steer(vec, layers) to activate.
+        self.register_buffer('steer_vec', torch.zeros(cfg.n_embd))
+        self.register_buffer('steer_scale', torch.zeros(1))      # 0 = off
+        self.register_buffer('steer_layer_mask',
+                             torch.zeros(cfg.n_layer, dtype=torch.bool))
+
+        # ── Novelty-fracture detector ──
+        # Rolling tension history → z-score gate. Fracture events are
+        # recorded as irreversible plasticity markers.
+        self.register_buffer('tension_history', torch.zeros(64))
+        self.register_buffer('tension_hist_ptr', torch.zeros(1, dtype=torch.long))
+        self.register_buffer('tension_hist_full', torch.zeros(1, dtype=torch.bool))
+        self.register_buffer('fracture_count', torch.zeros(1, dtype=torch.long))
+        self._current_block_idx = 0
+        self._fracture_threshold_z = 2.0
+
         # Initialize weights
         self.apply(self._init_weights)
 
@@ -662,6 +736,74 @@ class ADAM(nn.Module):
             phi = C1 + 0.8 * C2 + 0.6 * C3 + 0.5 * C4
             g = torch.autograd.grad(phi, s)[0]
         return g.detach()
+
+    # ────────────────────────────────────────────────────────────────
+    #  STEERING (activation control vectors)
+    # ────────────────────────────────────────────────────────────────
+
+    def _steer_for_block(self, block_idx: int):
+        """Return steer tensor for this block, or None if off."""
+        if float(self.steer_scale.item()) == 0.0:
+            return None
+        if not bool(self.steer_layer_mask[block_idx].item()):
+            return None
+        return self.steer_vec * self.steer_scale
+
+    @torch.no_grad()
+    def set_steer(self, direction: torch.Tensor, scale: float = 1.0,
+                  layers: Optional[List[int]] = None):
+        """Arm the activation-steering vector. direction: (n_embd,)."""
+        v = direction.detach().flatten()[:self.cfg.n_embd].to(self.steer_vec.device)
+        v = v / (v.norm() + 1e-6)
+        self.steer_vec.copy_(v)
+        self.steer_scale.fill_(float(scale))
+        mask = torch.zeros(self.cfg.n_layer, dtype=torch.bool,
+                           device=self.steer_layer_mask.device)
+        if layers is None:
+            # Default: inject in the second half of the stack
+            mask[self.cfg.n_layer // 2:] = True
+        else:
+            for li in layers:
+                if 0 <= li < self.cfg.n_layer:
+                    mask[li] = True
+        self.steer_layer_mask.copy_(mask)
+
+    @torch.no_grad()
+    def clear_steer(self):
+        self.steer_scale.zero_()
+        self.steer_layer_mask.zero_()
+
+    # ────────────────────────────────────────────────────────────────
+    #  NOVELTY FRACTURE  (z-score gate on tension)
+    # ────────────────────────────────────────────────────────────────
+
+    @torch.no_grad()
+    def _record_tension(self, tension: float):
+        H = self.tension_history.numel()
+        p = int(self.tension_hist_ptr.item())
+        self.tension_history[p] = float(tension)
+        p = (p + 1) % H
+        self.tension_hist_ptr.fill_(p)
+        if p == 0:
+            self.tension_hist_full.fill_(True)
+
+    @torch.no_grad()
+    def fracture_check(self, tension: Optional[float] = None) -> Dict:
+        """Return {z, fracture} for current or given tension vs history."""
+        t = float(tension if tension is not None else self._sub_tension)
+        H = self.tension_history
+        valid = H if bool(self.tension_hist_full.item()) \
+                else H[:int(self.tension_hist_ptr.item())]
+        if valid.numel() < 8:
+            return {'z': 0.0, 'fracture': False, 'tension': t,
+                    'mu': 0.0, 'sigma': 0.0}
+        mu, sigma = float(valid.mean().item()), float(valid.std().item() + 1e-6)
+        z = (t - mu) / sigma
+        fracture = z > self._fracture_threshold_z
+        if fracture:
+            self.fracture_count += 1
+        return {'z': z, 'fracture': bool(fracture), 'tension': t,
+                'mu': mu, 'sigma': sigma}
 
     def _current_drift(self):
         if not bool(self.identity_discovered):
@@ -750,8 +892,8 @@ class ADAM(nn.Module):
 
         # Run through fused blocks
         x = fused_seq
-        for block in self.blocks:
-            x = block(x, mem_size=prefix, state_pos=prefix)
+        for i, block in enumerate(self.blocks):
+            x = block(x, mem_size=prefix, state_pos=prefix, steer=self._steer_for_block(i))
         x = self.ln_f(x)
 
         # Slice
@@ -791,8 +933,8 @@ class ADAM(nn.Module):
             x = torch.cat([mem, state_emb], dim=1)
         else:
             x = state_emb
-        for block in self.blocks:
-            x = block(x, mem_size=K, state_pos=K)
+        for i, block in enumerate(self.blocks):
+            x = block(x, mem_size=K, state_pos=K, steer=self._steer_for_block(i))
         x = self.ln_f(x)
         state_out_embd = x[:, K, :].squeeze(0)
         state_fb = self.state_proj.embedding_to_state(state_out_embd)
@@ -818,6 +960,8 @@ class ADAM(nn.Module):
         # Subconscious tension
         self._sub_tension = 0.9 * self._sub_tension + 0.1 * self._epistemic_tension
         self._sub_anxiety = max(0.0, self._sub_tension - 1.0) * 0.1
+        # Feed the novelty-fracture rolling window
+        self._record_tension(self._sub_tension)
 
         # Transformer feedback
         state_fb, state_out_embd = self._fused_state_step()
@@ -1120,6 +1264,338 @@ class ADAM(nn.Module):
         self._total_repairs = ckpt.get('total_repairs', 0)
         self._refusal_count = ckpt.get('refusal_count', 0)
         self._energy = ckpt.get('energy', 1.0)
+
+
+# ══════════════════════════════════════════════════════════════════════
+#  ALIVE LEARNING  (core, fused — not a wrapper)
+#    SeasonalExperienceBuffer: tree-ring chronomemory
+#    ContinualLearner: EWC-anchored, novelty-fracture gated, wake/sleep
+# ══════════════════════════════════════════════════════════════════════
+
+import json as _json
+import time as _time
+import random as _random
+from collections import deque as _deque
+
+
+class SeasonalExperienceBuffer:
+    """Tree-ring chronomemory: a live ring plus sealed historical rings.
+
+    Every interaction goes into the live ring (capacity `season_size`). When
+    the live ring is full, it is sealed as a "season" and downsampled to
+    `keep_per_season` representative records (highest tension kept). Older
+    seasons are never deleted — they age but remain queryable. This gives
+    you an append-only history with bounded memory: you can query "what did
+    I see 5 seasons ago?" after thousands of interactions.
+    """
+
+    def __init__(self, path: str = 'experience.jsonl',
+                 season_size: int = 500, keep_per_season: int = 64,
+                 seasons_path: str = 'seasons.jsonl'):
+        self.path = path
+        self.seasons_path = seasons_path
+        self.season_size = season_size
+        self.keep_per_season = keep_per_season
+        self.live: _deque = _deque(maxlen=season_size)
+        self.seasons: List[List[Dict]] = []
+        self._load()
+
+    def _load(self):
+        if os.path.exists(self.path):
+            with open(self.path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        self.live.append(_json.loads(line))
+                    except Exception:
+                        pass
+        if os.path.exists(self.seasons_path):
+            with open(self.seasons_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        self.seasons.append(_json.loads(line))
+                    except Exception:
+                        pass
+
+    def _seal_if_full(self):
+        if len(self.live) < self.season_size:
+            return
+        records = list(self.live)
+        records.sort(key=lambda r: r.get('tension', 0.0), reverse=True)
+        ring = records[:self.keep_per_season]
+        ring_meta = {
+            'season_idx': len(self.seasons),
+            'n_original': len(records),
+            'sealed_at': _time.time(),
+            'records': ring,
+        }
+        self.seasons.append(ring_meta)
+        try:
+            with open(self.seasons_path, 'a', encoding='utf-8') as f:
+                f.write(_json.dumps(ring_meta, ensure_ascii=False) + '\n')
+        except Exception:
+            pass
+        self.live.clear()
+        # Also truncate the live jsonl (its content is now in seasons)
+        try:
+            open(self.path, 'w').close()
+        except Exception:
+            pass
+
+    def add(self, text: str, tension: float = 0.0, tag: str = 'user',
+            fracture: bool = False):
+        rec = {'t': _time.time(), 'text': text[:4000],
+               'tension': float(tension), 'tag': tag,
+               'fracture': bool(fracture)}
+        self.live.append(rec)
+        try:
+            with open(self.path, 'a', encoding='utf-8') as f:
+                f.write(_json.dumps(rec, ensure_ascii=False) + '\n')
+        except Exception:
+            pass
+        self._seal_if_full()
+
+    def sample(self, n: int, bias_to_fracture: float = 0.3) -> List[Dict]:
+        """Sample n records. Fraction `bias_to_fracture` drawn preferentially
+        from historical fracture events (rare, important)."""
+        pool_live = list(self.live)
+        pool_hist = [r for s in self.seasons for r in s.get('records', [])]
+        fracture_pool = [r for r in pool_live + pool_hist if r.get('fracture')]
+        out = []
+        if fracture_pool and bias_to_fracture > 0:
+            k = min(int(n * bias_to_fracture), len(fracture_pool))
+            out.extend(_random.sample(fracture_pool, k))
+        remaining = n - len(out)
+        all_pool = pool_live + pool_hist
+        if remaining > 0 and all_pool:
+            out.extend(_random.sample(all_pool, min(remaining, len(all_pool))))
+        return out
+
+    def recent(self, n: int) -> List[Dict]:
+        return list(self.live)[-n:]
+
+    def from_season(self, idx: int) -> List[Dict]:
+        if 0 <= idx < len(self.seasons):
+            return self.seasons[idx].get('records', [])
+        return []
+
+    def stats(self):
+        live = list(self.live)
+        tensions = [r.get('tension', 0) for r in live]
+        hist_count = sum(s.get('n_original', 0) for s in self.seasons)
+        fracture_count = sum(1 for r in live if r.get('fracture')) + \
+            sum(1 for s in self.seasons
+                for r in s.get('records', []) if r.get('fracture'))
+        return {
+            'live': len(live),
+            'live_capacity': self.season_size,
+            'seasons_sealed': len(self.seasons),
+            'total_historical': hist_count,
+            'total': len(live) + hist_count,
+            'fracture_events': fracture_count,
+            'mean_tension': (float(sum(tensions) / len(tensions))
+                             if tensions else 0.0),
+        }
+
+
+# Back-compat alias (older code imports ExperienceBuffer)
+ExperienceBuffer = SeasonalExperienceBuffer
+
+
+class ContinualLearner:
+    """Real-time continual learning fused into the core.
+
+    * wake_tick(text, tension): tiny EWC-anchored update. When a novelty
+      fracture is detected (tension z > threshold), the learning rate is
+      boosted — ordinary inputs barely move the weights, novel ones do.
+    * sleep_consolidate(): batch replay from SeasonalExperienceBuffer,
+      biased toward historical fracture events.
+
+    Safety rails: embeddings/memory frozen, EWC anchor to pre-trained
+    weights, per-param grad clipping, holographic memory writes on fracture.
+    """
+
+    def __init__(self, model, buffer: SeasonalExperienceBuffer,
+                 wake_lr: float = 5e-7,
+                 wake_lr_fracture: float = 5e-6,   # 10x on novelty
+                 sleep_lr: float = 2e-6,
+                 ewc_weight: float = 0.02,
+                 grad_clip: float = 0.5,
+                 enabled: bool = True):
+        self.m = model
+        self.buf = buffer
+        self.wake_lr = wake_lr
+        self.wake_lr_fracture = wake_lr_fracture
+        self.sleep_lr = sleep_lr
+        self.ewc_weight = ewc_weight
+        self.grad_clip = grad_clip
+        self.enabled = enabled
+        self.updates_applied = 0
+        self.fracture_updates = 0
+        self.loss_history: _deque = _deque(maxlen=500)
+        self.log: _deque = _deque(maxlen=200)
+        self.anchor = {n: p.detach().clone()
+                       for n, p in self.m.named_parameters()
+                       if self._trainable(n) and p.requires_grad}
+
+    def _trainable(self, n: str) -> bool:
+        if any(k in n for k in ('wte', 'wpe', 'lm_head',
+                                'memory.M', 'memory.M_holo',
+                                'memory.usage', 'memory.age',
+                                'memory.holo_keys')):
+            return False
+        return True
+
+    def _prep(self, text: str):
+        try:
+            import tiktoken
+            enc = tiktoken.get_encoding('gpt2')
+        except Exception:
+            return None, None
+        ids = enc.encode_ordinary(text)[:256]
+        if len(ids) < 4:
+            return None, None
+        x = torch.tensor([ids[:-1]], dtype=torch.long, device=self.m.device)
+        y = torch.tensor([ids[1:]],  dtype=torch.long, device=self.m.device)
+        return x, y
+
+    def _ewc_term(self):
+        total = torch.zeros(1, device=self.m.device)
+        for n, p in self.m.named_parameters():
+            if n in self.anchor:
+                total = total + ((p - self.anchor[n]) ** 2).sum()
+        return self.ewc_weight * total.squeeze()
+
+    def wake_tick(self, text: str, tension: Optional[float] = None):
+        if not self.enabled:
+            return None
+        x, y = self._prep(text)
+        if x is None:
+            return None
+        # Novelty gate
+        fr = self.m.fracture_check(tension)
+        lr = self.wake_lr_fracture if fr['fracture'] else self.wake_lr
+        was_training = self.m.training
+        self.m.train()
+        for p in self.m.parameters():
+            if p.grad is not None:
+                p.grad = None
+        with torch.enable_grad():
+            _, loss = self.m(x, y)
+            total = loss + self._ewc_term()
+            total.backward()
+        with torch.no_grad():
+            for n, p in self.m.named_parameters():
+                if p.grad is None or not self._trainable(n):
+                    if p.grad is not None:
+                        p.grad = None
+                    continue
+                g = p.grad
+                gn = g.norm().clamp(min=1e-8)
+                if gn > self.grad_clip:
+                    g = g * (self.grad_clip / gn)
+                p.sub_(lr * g)
+                p.grad = None
+        # On fracture: also write into holographic memory (irreversible
+        # plasticity marker — survives even if slot-memory is overwritten).
+        if fr['fracture'] and self.m.memory is not None:
+            with torch.no_grad():
+                emb = self.m.wte(x[0]).mean(dim=0).detach()
+                slot = int(self.m.fracture_count.item()) % self.m.memory.K
+                self.m.memory.write_holo(slot, emb)
+            self.fracture_updates += 1
+        if not was_training:
+            self.m.eval()
+        loss_val = float(loss.item())
+        self.loss_history.append(loss_val)
+        self.updates_applied += 1
+        self.log.append({'mode': 'wake', 'loss': loss_val, 't': _time.time(),
+                         'fracture': fr['fracture'], 'z': fr['z'],
+                         'text': text[:80]})
+        return {'loss': loss_val, 'fracture': fr['fracture'],
+                'z': fr['z'], 'lr_used': lr}
+
+    def sleep_consolidate(self, batch_size: int = 8, steps: int = 20):
+        if not self.enabled:
+            return {'status': 'disabled'}
+        was_training = self.m.training
+        self.m.train()
+        losses = []
+        for _ in range(steps):
+            batch = self.buf.sample(batch_size)
+            if not batch:
+                break
+            rows = []
+            for r in batch:
+                x, y = self._prep(r['text'])
+                if x is not None:
+                    rows.append((x, y))
+            if not rows:
+                continue
+            for p in self.m.parameters():
+                if p.grad is not None:
+                    p.grad = None
+            total_loss_val = 0.0
+            for x, y in rows:
+                with torch.enable_grad():
+                    _, l = self.m(x, y)
+                    (l / len(rows)).backward()
+                    total_loss_val += float(l.item()) / len(rows)
+            with torch.enable_grad():
+                self._ewc_term().backward()
+            with torch.no_grad():
+                for n, p in self.m.named_parameters():
+                    if p.grad is None or not self._trainable(n):
+                        if p.grad is not None:
+                            p.grad = None
+                        continue
+                    g = p.grad
+                    gn = g.norm().clamp(min=1e-8)
+                    if gn > self.grad_clip:
+                        g = g * (self.grad_clip / gn)
+                    p.sub_(self.sleep_lr * g)
+                    p.grad = None
+            losses.append(total_loss_val)
+            self.updates_applied += 1
+        if not was_training:
+            self.m.eval()
+        self.log.append({'mode': 'sleep', 'steps': len(losses),
+                         'loss_mean': (sum(losses) / len(losses)) if losses else 0.0,
+                         't': _time.time()})
+        return {
+            'steps_run': len(losses),
+            'loss_first': losses[0] if losses else None,
+            'loss_last':  losses[-1] if losses else None,
+            'mean_loss':  (sum(losses) / len(losses)) if losses else 0.0,
+            'updates_total': self.updates_applied,
+        }
+
+    def stats(self):
+        recent = list(self.loss_history)[-50:]
+        return {
+            'enabled': self.enabled,
+            'updates_applied': self.updates_applied,
+            'fracture_updates': self.fracture_updates,
+            'fracture_count_model': int(self.m.fracture_count.item()),
+            'buffer': self.buf.stats(),
+            'recent_loss': list(self.loss_history)[-10:],
+            'mean_loss_recent': (sum(recent) / len(recent)) if recent else None,
+            'anchor_params': len(self.anchor),
+        }
+
+    def save_snapshot(self, path: str):
+        torch.save({
+            'cfg': self.m.cfg,
+            'state_dict': self.m.state_dict(),
+            'step_count': self.m.step_count,
+            'updates_applied': self.updates_applied,
+            'snapshot_time': _time.time(),
+        }, path)
 
 
 # ══════════════════════════════════════════════════════════════════════
