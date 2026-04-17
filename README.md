@@ -1,8 +1,27 @@
-# ADAM — A Dynamical Alive Mind  · v0.4 "The Alive Learner"
+# ADAM — A Dynamical Alive Mind  · v0.5 "Core Fused"
 
 > The first transformer architecture with brain-like persistent memory,
 > constraint-based identity, live emotion state, and **real-time continual
 > learning from every interaction** — all inside a single `state_dict`.
+
+**Live demo:** https://huggingface.co/spaces/lisedi/adam-demo
+**Checkpoint:** https://huggingface.co/lisedi/adam
+
+## What's new in v0.5 (fused into the core, not wrappers)
+
+Four capabilities added directly to `adam.py`, persisting in `state_dict`:
+
+1. **Holographic memory (HRR)** — `M_holo` register with circular-convolution
+   bind/unbind. Survives 30% dim damage with 100% top-1 recall on 8 engrams.
+2. **Activation steering** — `steer_vec` buffer + per-layer mask, injected
+   into the residual stream. Same prompt → different directions → different logits.
+3. **Novelty-fracture detector** — rolling tension z-score; fracture events
+   fire when `z > 2.0`, triggering 10× learning rate and holographic writes.
+4. **Seasonal tree-ring chronomemory** — append-only seasonal buffer, older
+   seasons downsampled (highest-tension kept) but never deleted. Queryable
+   by season index after thousands of interactions.
+
+Tests: **20/20 original + 4/4 v0.5 ablations pass** in ~5s.
 
 ## What's new in v0.4 (no retraining, no extra params)
 
