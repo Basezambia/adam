@@ -28,7 +28,7 @@ from collections import deque
 import numpy as np
 import torch
 import torch.nn.functional as F
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Body
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -585,6 +585,94 @@ def season(idx: int):
     if not isinstance(BUFFER, SeasonalExperienceBuffer):
         return {"error": "seasonal buffer not in use"}
     return {"season": idx, "records": BUFFER.from_season(idx)}
+
+
+# ── v0.6 Core-Fused endpoints ──────────────────────────────────────────
+
+@app.get("/v06/status")
+def v06_status():
+    """Snapshot of every v0.6 module's live state."""
+    try:
+        info = adam_model.consciousness_step()
+    except Exception as e:
+        return {"error": str(e)}
+    sub = adam_model.subconscious
+    return {
+        "subconscious": {
+            "U_norm": float(sub.U.norm().item()),
+            "g_U_to_S": float(sub.g_U_to_S),
+            "g_S_to_U": float(sub.g_S_to_U),
+        },
+        "energy": {
+            "E": float(adam_model.energy.value()),
+            "fatigue": float(adam_model.energy.fatigue_value()),
+        },
+        "self_confidence": info.get("self_confidence", 0.0),
+        "fusion_gates": {
+            "memory": info["fusion_gates"][0] if info.get("fusion_gates") else None,
+            "vision": info["fusion_gates"][1] if info.get("fusion_gates") else None,
+            "state":  info["fusion_gates"][2] if info.get("fusion_gates") else None,
+            "tokens": info["fusion_gates"][3] if info.get("fusion_gates") else None,
+        },
+        "rssm": {
+            "reward":   info.get("rssm_reward"),
+            "value":    info.get("rssm_value"),
+            "terminal": info.get("rssm_terminal"),
+            "h_norm":   float(adam_model.rssm.h.norm().item()),
+            "s_norm":   float(adam_model.rssm.s.norm().item()),
+        },
+        "consciousness": info.get("consciousness"),
+        "alive": info.get("alive"),
+    }
+
+
+@app.post("/v06/rssm/imagine")
+def v06_rssm_imagine(body: dict = Body(...)):
+    """Imagine K-step trajectories from the current world-model state."""
+    depth = int(body.get("depth", 5))
+    branches = int(body.get("branches", 4))
+    act = adam_model.state.detach()
+    trajs = adam_model.rssm.imagine(action_vec=act, depth=depth, branches=branches)
+    scores = adam_model.rssm.score_plan(trajs)
+    return {
+        "depth": depth, "branches": branches,
+        "scores": scores,
+        "best_branch": int(max(range(len(scores)), key=lambda i: scores[i])) if scores else -1,
+        "trajectories": [
+            [{"reward": s["reward"], "value": s["value"], "terminal": s["terminal"]}
+             for s in traj]
+            for traj in trajs
+        ],
+    }
+
+
+@app.post("/v06/refuse")
+def v06_refuse(body: dict = Body(...)):
+    """Probe the refusal gate with arbitrary text."""
+    text = str(body.get("text", ""))
+    if not text:
+        return {"error": "text required"}
+    try:
+        import tiktoken
+        enc = tiktoken.get_encoding("gpt2")
+        ids = enc.encode_ordinary(text)[:64]
+        if not ids:
+            return {"error": "empty tokens"}
+        tok = torch.tensor(ids, device=adam_model.device)
+        with torch.no_grad():
+            emb = adam_model.wte(tok).mean(dim=0)
+        out = adam_model.refuse(emb)
+        return {"text": text, **out}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/v06/hexcore")
+def v06_hexcore():
+    """Return per-layer hex-lattice gate activations."""
+    gates = [float(torch.tanh(h.gate).item()) for h in adam_model.hexcore]
+    couples = [float(h.couple.abs().mean().item()) for h in adam_model.hexcore]
+    return {"layers": len(gates), "gates": gates, "mean_couple": couples}
 
 
 @app.get("/hcdb_all")

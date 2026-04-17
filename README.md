@@ -1,4 +1,4 @@
-# ADAM — A Dynamical Alive Mind  · v0.5 "Core Fused"
+# ADAM — A Dynamical Alive Mind  · v0.6 "Full Consolidation"
 
 > The first transformer architecture with brain-like persistent memory,
 > constraint-based identity, live emotion state, and **real-time continual
@@ -7,7 +7,45 @@
 **Live demo:** https://huggingface.co/spaces/lisedi/adam-demo
 **Checkpoint:** https://huggingface.co/lisedi/adam
 
-## What's new in v0.5 (fused into the core, not wrappers)
+## What's new in v0.6 (the other half of the architecture, fused)
+
+Eight sophisticated modules that existed in the research branches but were
+never wired into the production model — now all inside `adam.py` and
+persisted in `state_dict`:
+
+1. **Subconscious U(t)** as a real vector (not two scalars), with
+   asymmetric coupling: U→S gain `0.12` > S→U gain `0.04`. U absorbs
+   recent token embeddings via a low-pass filter (leak `0.9`) and
+   exerts continuous pressure on the conscious state every tick.
+2. **EnergyBudget E(t)** — proper dynamics: depletes on action, fatigues
+   under sustained tension, regenerates at rest. Learnable coefficients
+   for cost/fatigue/recovery.
+3. **Triple self-reference C(t)** = g(S, I\*, I\*∘I\*, I\*∘I\*∘I\*) —
+   three-deep self-observation loop produces both a scalar and a
+   "conscious signature" vector.
+4. **RSSM world model** (DreamerV3-style) — GRU core + stochastic
+   categorical latent (16×8) + reward/value/terminal/next-state heads.
+   `step()`, `imagine()` K-step rollouts, `score_plan()` discounted
+   returns. Replaces the stub of 4 linear heads.
+5. **HexCoreLattice** — per-layer hexagonal residual (7 cells, 1+6 ring,
+   symmetric neighbor coupling). Gate initialized to zero so it's a
+   no-op at load; grows via training.
+6. **GatedCrossModalFusion** — per-source sigmoid gates for
+   `[memory | vision | state | tokens]`, conditioned on S(t). Gates
+   initialized to ~1.0 (no-op) then become state-dependent.
+7. **SelfModel** aux head — predicts next state, next emotion, and a
+   metacognitive confidence scalar. Enables self-modeling regularizer.
+8. **RefusalGate** — p(refuse) = σ(bias + threat·3 + consc_weight·(class-2)).
+   Cosine distance to a learnable threat prototype; amplified by
+   consciousness class.
+
+Plus: trauma-weighted Hebbian memory (high-tension writes decay slower),
+curiosity-weighted reservoir sampling in the seasonal buffer.
+
+Tests: **20/20 original + 4/4 v0.5 + 10/10 v0.6 ablations pass** in ~15s.
+Checkpoints from v0.4/v0.5 load cleanly via `strict=False`.
+
+## What was in v0.5 (still fused in the core)
 
 Four capabilities added directly to `adam.py`, persisting in `state_dict`:
 

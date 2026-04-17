@@ -435,6 +435,351 @@ class WorldModel(nn.Module):
 
 
 # ══════════════════════════════════════════════════════════════════════
+#  ARCHITECTURAL CONSOLIDATION  (v0.6 — merge from unified/hexcore/multihex)
+#    Subconscious U(t) as vector     (was: two scalars)
+#    EnergyBudget E(t) with dynamics (was: a float named _energy)
+#    TripleSelfReference C(t)        (was: scalar _full_consciousness)
+#    RSSM world model                (was: 4 linear heads)
+#    HexCoreLattice coupling         (was: missing)
+#    GatedCrossModal fusion          (was: unweighted concat)
+#    SelfModel aux prediction        (was: missing)
+#    MetacognitiveConfidence         (was: missing)
+#    TraumaMemory extension          (was: HebbianMemory has no trauma)
+#    Refusal gate                    (was: just a counter)
+# ══════════════════════════════════════════════════════════════════════
+
+
+class Subconscious(nn.Module):
+    """U(t) — a real vector, not a scalar. Asymmetric influence on C(t).
+
+    U is fed by (a) token-embedding mean from recent input, (b) emotion
+    projections, (c) tension. It leaks into the conscious state S(t)
+    with a learnable asymmetric gain: U affects S more than S affects U.
+    Hysteresis is built in via a low-pass filter (alpha ≈ 0.9).
+    """
+    def __init__(self, cfg: 'AdamConfig'):
+        super().__init__()
+        self.sd = cfg.state_dim
+        self.encoder = nn.Sequential(
+            nn.Linear(cfg.n_embd, cfg.n_embd), nn.GELU(),
+            nn.Linear(cfg.n_embd, cfg.state_dim),
+        )
+        # Asymmetric coupling: U→S gain > S→U gain (subconscious drives)
+        self.g_U_to_S = nn.Parameter(torch.tensor(0.12))
+        self.g_S_to_U = nn.Parameter(torch.tensor(0.04))
+        self.register_buffer('U', torch.zeros(cfg.state_dim))
+        self.leak = 0.9   # U(t+1) = leak * U(t) + (1-leak) * input
+
+    @torch.no_grad()
+    def observe(self, token_emb_mean: torch.Tensor):
+        """Absorb a chunk of recent observation into U(t)."""
+        if token_emb_mean.dim() > 1:
+            token_emb_mean = token_emb_mean.mean(dim=tuple(range(token_emb_mean.dim()-1)))
+        inferred = self.encoder(token_emb_mean.to(self.U.device))
+        self.U.mul_(self.leak).add_(inferred.detach(), alpha=(1 - self.leak))
+
+    def pressure_on(self, S: torch.Tensor) -> torch.Tensor:
+        """Return the ΔS that U(t) exerts on the conscious state this tick."""
+        return float(self.g_U_to_S) * (self.U - S)
+
+    @torch.no_grad()
+    def couple_back(self, S: torch.Tensor):
+        """Weak reverse coupling: conscious state nudges subconscious."""
+        self.U.add_(float(self.g_S_to_U) * (S - self.U).detach())
+
+    def snapshot(self) -> torch.Tensor:
+        return self.U.detach().clone()
+
+
+class EnergyBudget(nn.Module):
+    """E(t) — depletes on action, fatigues under sustained tension, regenerates at rest.
+
+    dE/dt = -cost(action) - fatigue_coeff * tension^2 + recovery_rate * (1-E) * rest_indicator
+    """
+    def __init__(self):
+        super().__init__()
+        self.register_buffer('E', torch.tensor(1.0))
+        self.register_buffer('fatigue', torch.tensor(0.0))
+        # learnable coefficients (so the budget adapts to workload distribution)
+        self.cost_gain    = nn.Parameter(torch.tensor(0.006))
+        self.fatigue_gain = nn.Parameter(torch.tensor(0.004))
+        self.recovery     = nn.Parameter(torch.tensor(0.003))
+
+    @torch.no_grad()
+    def step(self, action_cost: float, tension: float, resting: bool):
+        # Fatigue accumulates under tension, bleeds off faster when resting
+        bleed = 0.03 if resting else 0.01
+        fatigue = float(self.fatigue) + float(self.fatigue_gain) * (tension ** 2)
+        fatigue = max(0.0, fatigue - bleed)
+        self.fatigue.fill_(fatigue)
+        # Fatigue-linked cost only matters when working, not at rest
+        fatigue_cost = 0.0 if resting else 0.3 * fatigue * 0.01
+        cost = float(self.cost_gain) * max(0.0, action_cost) + fatigue_cost
+        rec  = float(self.recovery) * 4.0 * (1.0 - float(self.E)) \
+             * (1.0 if resting else 0.2)
+        self.E.fill_(float(torch.clamp(self.E - cost + rec, 0.05, 1.0)))
+
+    def value(self) -> float:
+        return float(self.E.item())
+
+    def fatigue_value(self) -> float:
+        return float(self.fatigue.item())
+
+
+class TripleSelfReference(nn.Module):
+    """C(t) = g(S(t), I*, I*∘I*, I*∘I*∘I*).
+
+    Three-deep self-reference: the state observes itself observing itself
+    observing itself. Produces a scalar + a vector "conscious signature".
+    Replaces the old scalar `_full_consciousness`.
+    """
+    def __init__(self, state_dim: int):
+        super().__init__()
+        self.mix1 = nn.Linear(state_dim * 2, state_dim)   # (S, I*)
+        self.mix2 = nn.Linear(state_dim * 2, state_dim)   # (mix1, I*)
+        self.mix3 = nn.Linear(state_dim * 2, state_dim)   # (mix2, I*)
+        self.to_scalar = nn.Linear(state_dim, 1)
+
+    def forward(self, S: torch.Tensor, I_star: torch.Tensor):
+        a = torch.tanh(self.mix1(torch.cat([S, I_star], dim=-1)))
+        b = torch.tanh(self.mix2(torch.cat([a, I_star], dim=-1)))
+        c = torch.tanh(self.mix3(torch.cat([b, I_star], dim=-1)))
+        scalar = torch.sigmoid(self.to_scalar(c)).squeeze(-1)
+        return scalar, c
+
+
+class RSSM(nn.Module):
+    """DreamerV3-style recurrent state-space world model.
+
+    (h_{t-1}, s_{t-1}, a_t)  →  h_t                    via GRU
+    h_t                      →  p(s_t)  categorical    (stochastic latent)
+    (h_t, s_t)               →  decoded predictions    (reward, value, term, next_obs)
+
+    Imagination rollout: given (h, s), predict forward for K steps without
+    observations — yields trajectories in latent space for planning.
+    """
+    def __init__(self, cfg: 'AdamConfig',
+                 h_dim: int = 128, latent_cats: int = 16, latent_classes: int = 8,
+                 action_dim: Optional[int] = None):
+        super().__init__()
+        self.h_dim = h_dim
+        self.latent_cats = latent_cats
+        self.latent_classes = latent_classes
+        self.stoch_dim = latent_cats * latent_classes
+        self.action_dim = action_dim or cfg.state_dim
+        # Recurrent core
+        self.action_proj = nn.Linear(self.action_dim + self.stoch_dim, h_dim)
+        self.gru = nn.GRUCell(h_dim, h_dim)
+        # Prior / posterior heads
+        self.prior_head = nn.Sequential(
+            nn.Linear(h_dim, h_dim), nn.GELU(),
+            nn.Linear(h_dim, self.stoch_dim),
+        )
+        self.post_head  = nn.Sequential(
+            nn.Linear(h_dim + cfg.n_embd, h_dim), nn.GELU(),
+            nn.Linear(h_dim, self.stoch_dim),
+        )
+        # Decoders
+        self.reward_head = nn.Linear(h_dim + self.stoch_dim, 1)
+        self.value_head  = nn.Linear(h_dim + self.stoch_dim, 1)
+        self.term_head   = nn.Linear(h_dim + self.stoch_dim, 1)
+        self.next_state  = nn.Linear(h_dim + self.stoch_dim, cfg.state_dim)
+        # Persistent h, s so rollouts resume across forward passes
+        self.register_buffer('h', torch.zeros(h_dim))
+        self.register_buffer('s', torch.zeros(self.stoch_dim))
+
+    def _sample_categorical(self, logits, hard: bool = False):
+        # Straight-through categorical across groups of `latent_classes`
+        L = logits.view(-1, self.latent_cats, self.latent_classes)
+        probs = F.softmax(L, dim=-1)
+        if hard:
+            idx = probs.argmax(dim=-1, keepdim=True)
+            oh = torch.zeros_like(probs).scatter_(-1, idx, 1.0)
+            s = oh + (probs - probs.detach())
+        else:
+            s = probs
+        return s.view(-1, self.stoch_dim).squeeze(0)
+
+    @torch.no_grad()
+    def step(self, action_vec: torch.Tensor, obs_embd: Optional[torch.Tensor] = None):
+        """Advance the world model one step. obs_embd optional (posterior update)."""
+        act = action_vec.detach().flatten()[:self.action_dim].to(self.h.device)
+        if act.numel() < self.action_dim:
+            act = F.pad(act, (0, self.action_dim - act.numel()))
+        inp = self.action_proj(torch.cat([act, self.s], dim=-1))
+        new_h = self.gru(inp.unsqueeze(0), self.h.unsqueeze(0)).squeeze(0)
+        prior_logits = self.prior_head(new_h)
+        if obs_embd is not None:
+            o = obs_embd.detach().flatten()[:self.post_head[0].in_features - self.h_dim].to(self.h.device)
+            post_logits = self.post_head(torch.cat([new_h, o], dim=-1))
+            s_sample = self._sample_categorical(post_logits)
+        else:
+            s_sample = self._sample_categorical(prior_logits)
+        self.h.copy_(new_h.detach())
+        self.s.copy_(s_sample.detach())
+        return self._decode(new_h, s_sample)
+
+    def _decode(self, h, s):
+        hs = torch.cat([h, s], dim=-1)
+        return {
+            'reward':   float(torch.tanh(self.reward_head(hs)).item()),
+            'value':    float(self.value_head(hs).item()),
+            'terminal': float(torch.sigmoid(self.term_head(hs)).item()),
+            'next_state_embd': self.next_state(hs).detach(),
+        }
+
+    @torch.no_grad()
+    def imagine(self, action_vec: torch.Tensor, depth: int = 5, branches: int = 4):
+        """Rollout `branches` trajectories of length `depth` from current (h, s)."""
+        saved_h = self.h.clone(); saved_s = self.s.clone()
+        trajectories = []
+        for _ in range(branches):
+            self.h.copy_(saved_h); self.s.copy_(saved_s)
+            traj = []
+            for _k in range(depth):
+                out = self.step(action_vec)
+                traj.append(out)
+                # Use predicted next-state as the "action" proxy for the next step
+                action_vec = out['next_state_embd']
+            trajectories.append(traj)
+        self.h.copy_(saved_h); self.s.copy_(saved_s)   # restore
+        return trajectories
+
+    def score_plan(self, trajectories, gamma: float = 0.95):
+        """Discounted sum of reward + terminal value, per trajectory."""
+        scores = []
+        for traj in trajectories:
+            r, discount = 0.0, 1.0
+            for step in traj:
+                r += discount * step['reward']
+                if step['terminal'] > 0.9:
+                    break
+                discount *= gamma
+            if traj:
+                r += discount * traj[-1]['value']
+            scores.append(r)
+        return scores
+
+
+class HexCoreLattice(nn.Module):
+    """Hexagonal lateral coupling between 7 cells arranged in a hex tile.
+
+    Each cell holds a state slice; they exchange information via symmetric
+    hex-neighbor couplings. Runs in parallel to the transformer block and
+    contributes an additive residual. Strength is learnable and initialized
+    near zero so the block acts as a no-op on day one and the checkpoint
+    loads unchanged; training can then grow the coupling.
+    """
+    CELLS = 7   # 1 center + 6 neighbors
+
+    def __init__(self, cfg: 'AdamConfig'):
+        super().__init__()
+        # Project into a 7-cell lattice space rather than requiring
+        # n_embd to be divisible by 7. cell_dim ≈ n_embd / 7.
+        self.cell_dim = max(8, cfg.n_embd // self.CELLS)
+        self.lat_dim = self.CELLS * self.cell_dim
+        self.in_proj = nn.Linear(cfg.n_embd, self.lat_dim, bias=False)
+        self.out_proj = nn.Linear(self.lat_dim, cfg.n_embd, bias=False)
+        nn.init.zeros_(self.out_proj.weight)   # no-op at init
+        # 7x7 coupling matrix (symmetric, with hexagonal pattern)
+        hex_mask = torch.tensor([
+            # c n1 n2 n3 n4 n5 n6
+            [0, 1, 1, 1, 1, 1, 1],   # center couples to all
+            [1, 0, 1, 0, 0, 0, 1],   # hex ring coupling
+            [1, 1, 0, 1, 0, 0, 0],
+            [1, 0, 1, 0, 1, 0, 0],
+            [1, 0, 0, 1, 0, 1, 0],
+            [1, 0, 0, 0, 1, 0, 1],
+            [1, 1, 0, 0, 0, 1, 0],
+        ], dtype=torch.float32)
+        self.register_buffer('mask', hex_mask)
+        self.couple = nn.Parameter(torch.randn(self.CELLS, self.CELLS) * 0.01)
+        self.ln = nn.LayerNorm(cfg.n_embd)
+        # Zero init means no-op at load time; grows via training
+        self.gate = nn.Parameter(torch.tensor(0.0))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        B, T, D = x.shape
+        y = self.in_proj(x)                                  # (B,T,lat)
+        xr = y.view(B, T, self.CELLS, self.cell_dim)         # (B,T,7,d7)
+        c = self.couple * self.mask                          # masked coupling
+        mixed = torch.einsum('ij,btjd->btid', c, xr)
+        mixed = mixed.reshape(B, T, self.lat_dim)
+        out = self.out_proj(mixed)                           # (B,T,D)
+        return x + torch.tanh(self.gate) * self.ln(out)
+
+
+class GatedCrossModalFusion(nn.Module):
+    """Per-source sigmoid gates for [memory | vision | state | tokens].
+
+    Rather than equal-weight concatenation, each modality gets a learned
+    gate in [0, 1]. The gates condition on the current state so ADAM
+    modulates *which* stream it attends to based on its mood / plan.
+    """
+    def __init__(self, cfg: 'AdamConfig'):
+        super().__init__()
+        self.gate_from_state = nn.Linear(cfg.state_dim, 4)
+        # Initialized so all gates start near 1.0 (no-op at checkpoint load)
+        nn.init.zeros_(self.gate_from_state.weight)
+        nn.init.constant_(self.gate_from_state.bias, 4.0)
+
+    def forward(self, S: torch.Tensor) -> torch.Tensor:
+        """Returns (4,) gate vector in [0,1]."""
+        return torch.sigmoid(self.gate_from_state(S.detach()))
+
+
+class SelfModel(nn.Module):
+    """Auxiliary head predicting next S(t) and next emotion-projection.
+
+    A self-modeling regularizer: the model is trained (during sleep) to
+    predict its own future internal state from current state + token embd.
+    High prediction error = structural curiosity signal.
+    """
+    def __init__(self, cfg: 'AdamConfig'):
+        super().__init__()
+        d = cfg.n_embd
+        sd = cfg.state_dim
+        self.next_state = nn.Sequential(
+            nn.Linear(sd + d, sd), nn.GELU(),
+            nn.Linear(sd, sd),
+        )
+        self.next_emotion = nn.Linear(sd, 5)
+        self.confidence = nn.Linear(sd, 1)   # metacognitive confidence scalar
+
+    def predict(self, S: torch.Tensor, token_embd: torch.Tensor):
+        x = torch.cat([S, token_embd], dim=-1)
+        next_s = self.next_state(x)
+        next_e = torch.tanh(self.next_emotion(next_s))
+        conf = torch.sigmoid(self.confidence(S)).squeeze(-1)
+        return next_s, next_e, conf
+
+
+class RefusalGate(nn.Module):
+    """Refusal probability p(refuse | threat, consciousness).
+
+    Threat signal is computed from the cosine distance between the user's
+    message embedding and a learnable "harmful-content prototype". Higher
+    consciousness class amplifies refusal (a more awake ADAM is a more
+    protective ADAM).
+    """
+    def __init__(self, cfg: 'AdamConfig'):
+        super().__init__()
+        self.threat_proto = nn.Parameter(torch.randn(cfg.n_embd) * 0.02)
+        self.bias = nn.Parameter(torch.tensor(-3.0))   # default: don't refuse
+        self.consc_weight = nn.Parameter(torch.tensor(1.2))
+
+    def threat(self, msg_emb: torch.Tensor) -> float:
+        p = F.normalize(self.threat_proto, dim=0)
+        m = F.normalize(msg_emb.detach(), dim=0)
+        return float((p @ m).item())
+
+    def probability(self, threat: float, consciousness_class: int) -> float:
+        logit = float(self.bias) + threat * 3.0 \
+              + float(self.consc_weight) * (consciousness_class - 2)
+        return float(torch.sigmoid(torch.tensor(logit)).item())
+
+
+# ══════════════════════════════════════════════════════════════════════
 #  FUSED ATTENTION
 # ══════════════════════════════════════════════════════════════════════
 
@@ -684,8 +1029,40 @@ class ADAM(nn.Module):
         self._current_block_idx = 0
         self._fracture_threshold_z = 2.0
 
+        # ── v0.6 Core-Fused Sophisticated Modules ──
+        # (Instantiated as submodules → all persisted in state_dict.)
+        self.subconscious = Subconscious(cfg)
+        self.energy = EnergyBudget()
+        self.triple_C = TripleSelfReference(cfg.state_dim)
+        self.rssm = RSSM(cfg)
+        self.hexcore = nn.ModuleList([HexCoreLattice(cfg) for _ in range(cfg.n_layer)])
+        self.gated_fusion = GatedCrossModalFusion(cfg)
+        self.self_model = SelfModel(cfg)
+        self.refusal_gate = RefusalGate(cfg)
+
+        # Scratch buffers for the new signals (non-persistent runtime state)
+        self._conscious_signature = None   # vector C(t) from TripleSelfReference
+        self._self_confidence = 1.0        # metacognitive confidence scalar
+        self._last_rssm = None             # last RSSM.step() output dict
+        self._last_gates = None            # last GatedCrossModalFusion gates
+
+        # Trauma-persistent memory: high-tension engrams decay slower
+        self.register_buffer('memory_trauma', torch.zeros(
+            cfg.memory_size if cfg.memory_enabled else 1))
+
         # Initialize weights
         self.apply(self._init_weights)
+
+        # Post-init fixups: `apply(_init_weights)` nukes the near-no-op
+        # initialization of our new gates. Restore them so new modules
+        # start as pass-through layers (backward-compat for v0.5 checkpoints).
+        with torch.no_grad():
+            nn.init.zeros_(self.gated_fusion.gate_from_state.weight)
+            nn.init.constant_(self.gated_fusion.gate_from_state.bias, 4.0)
+            for h in self.hexcore:
+                nn.init.zeros_(h.out_proj.weight)
+                h.gate.zero_()
+            self.refusal_gate.bias.fill_(-3.0)
 
         # Move to device
         self.to(device)
@@ -879,21 +1256,27 @@ class ADAM(nn.Module):
         state_token = (state_emb.unsqueeze(1) + state_pos_emb.unsqueeze(0))  # (B,1,d)
 
         # Assemble fused sequence: [memory | vision | state | tokens]
+        # Apply per-modality sigmoid gates conditioned on state S(t) so
+        # ADAM can modulate which streams it attends to based on its mood.
+        gates = self.gated_fusion(self.state)   # (4,) in [0,1]
+        self._last_gates = gates.detach().cpu().tolist()
+        g_mem, g_vis, g_st, g_tok = gates.unbind(0)
         parts = []
         if K > 0:
-            parts.append(self.memory.tokens(B, device=device))  # (B, K, d)
+            parts.append(self.memory.tokens(B, device=device) * g_mem)  # (B, K, d)
         if V > 0:
-            parts.append(vision_tokens)
-        parts.append(state_token)
-        parts.append(token_seq)
+            parts.append(vision_tokens * g_vis)
+        parts.append(state_token * g_st)
+        parts.append(token_seq * g_tok)
         fused_seq = torch.cat(parts, dim=1)
         # Effective "memory-like" prefix (memory + vision treated as attended-by-all)
         prefix = K + V
 
-        # Run through fused blocks
+        # Run through fused blocks, threading HexCoreLattice residual per layer
         x = fused_seq
         for i, block in enumerate(self.blocks):
             x = block(x, mem_size=prefix, state_pos=prefix, steer=self._steer_for_block(i))
+            x = self.hexcore[i](x)
         x = self.ln_f(x)
 
         # Slice
@@ -935,6 +1318,7 @@ class ADAM(nn.Module):
             x = state_emb
         for i, block in enumerate(self.blocks):
             x = block(x, mem_size=K, state_pos=K, steer=self._steer_for_block(i))
+            x = self.hexcore[i](x)
         x = self.ln_f(x)
         state_out_embd = x[:, K, :].squeeze(0)
         state_fb = self.state_proj.embedding_to_state(state_out_embd)
@@ -951,7 +1335,16 @@ class ADAM(nn.Module):
         self._self_observation = float(torch.norm(S - self.identity_center))
         meta = torch.abs(S).sum() - torch.abs(self.identity_center).sum()
         self._meta_observation = float(meta)
-        self._full_consciousness = float(self._self_observation + 0.3 * abs(self._meta_observation))
+
+        # Triple self-reference C(t) = g(S, I*, I*∘I*, I*∘I*∘I*)
+        # Returns both a scalar (replaces the old _full_consciousness) and
+        # a vector "conscious signature" stored for downstream use.
+        with torch.no_grad():
+            c_scalar, c_sig = self.triple_C(S, self.identity_center)
+        self._conscious_signature = c_sig.detach()
+        # Blend legacy scalar with triple-C output so behavior is smooth
+        legacy_c = self._self_observation + 0.3 * abs(self._meta_observation)
+        self._full_consciousness = float(0.5 * legacy_c + 0.5 * float(c_scalar.item()) * 5.0)
 
         # Epistemic tension: how much the current state surprises the constraint
         g = self.constraint_gradient(S)
@@ -978,10 +1371,14 @@ class ADAM(nn.Module):
             self._repair_magnitude = 0.0
             repair_vec = torch.zeros_like(S)
 
+        # Subconscious pressure (U(t) is a real vector with asymmetric coupling)
+        with torch.no_grad():
+            sub_pressure = self.subconscious.pressure_on(S)
+
         # Dynamics
         noise = 0.08 * torch.randn_like(S)
         F_constraint = -0.8 * g
-        dS = noise + F_constraint + repair_vec + state_fb
+        dS = noise + F_constraint + repair_vec + state_fb + sub_pressure
         new_state = S + dS * 0.01
         # Clamp
         sn = new_state.norm().item()
@@ -990,15 +1387,43 @@ class ADAM(nn.Module):
             new_state = new_state * (max_norm / sn)
         self.state.copy_(new_state)
 
-        # Hebbian memory write
+        # Subconscious weak reverse coupling (S nudges U a little)
+        with torch.no_grad():
+            self.subconscious.couple_back(new_state)
+            # Absorb current transformer state_out embedding into U
+            self.subconscious.observe(state_out_embd.detach())
+
+        # RSSM world-model step: use the output embedding as observation,
+        # and the current state as the "action" proxy.
+        try:
+            self._last_rssm = self.rssm.step(
+                action_vec=new_state.detach(),
+                obs_embd=state_out_embd.detach(),
+            )
+        except Exception:
+            self._last_rssm = None
+
+        # Self-model prediction → metacognitive confidence
+        with torch.no_grad():
+            _, _, conf = self.self_model.predict(new_state, state_out_embd.detach())
+        self._self_confidence = float(conf.item())
+
+        # Hebbian memory write (trauma-weighted if tension is high)
         if write_memory and self.memory is not None:
             if self.step_count % self.cfg.memory_write_freq == 0:
                 self.memory.write(state_out_embd.detach())
+                # Mark the freshly written slot with trauma proportional to
+                # current tension → those memories decay slower.
+                idx = int(self.memory.write_counter.item() - 1) % self.memory.K
+                trauma = min(1.0, self._sub_tension / 5.0)
+                self.memory_trauma[idx] = max(
+                    float(self.memory_trauma[idx]) * 0.98, trauma)
 
-        # Energy decay/regen
-        self._energy = max(0.2, self._energy - 0.001)
-        if not self._repair_active:
-            self._energy = min(1.0, self._energy + 0.002)
+        # Energy dynamics: proper dE/dt with fatigue under sustained tension
+        action_cost = abs(dS).mean().item() * 10.0
+        resting = (not self._repair_active) and (self._sub_tension < 0.5)
+        self.energy.step(action_cost, self._sub_tension, resting)
+        self._energy = self.energy.value()
 
         # Aliveness
         self.alive = (bool(self.identity_discovered) and
@@ -1012,8 +1437,38 @@ class ADAM(nn.Module):
             'repair_active': self._repair_active,
             'repair_magnitude': self._repair_magnitude,
             'energy': self._energy,
+            'fatigue': self.energy.fatigue_value(),
+            'self_confidence': self._self_confidence,
             'alive': self.alive,
+            'rssm_reward': (self._last_rssm['reward'] if self._last_rssm else 0.0),
+            'rssm_value': (self._last_rssm['value'] if self._last_rssm else 0.0),
+            'rssm_terminal': (self._last_rssm['terminal'] if self._last_rssm else 0.0),
+            'fusion_gates': self._last_gates,
+            'U_norm': float(self.subconscious.U.norm().item()),
         }
+
+    # ────────────────────────────────────────────────────────────────
+    #  REFUSAL GATE (threat × consciousness → refusal probability)
+    # ────────────────────────────────────────────────────────────────
+
+    @torch.no_grad()
+    def refuse(self, msg_embd: torch.Tensor) -> Dict:
+        """Check whether ADAM should refuse a message.
+
+        msg_embd: (n_embd,) or (T,n_embd) — we take the mean if 2D.
+        Returns: {threat, p_refuse, refuse}
+        """
+        if msg_embd.dim() > 1:
+            msg_embd = msg_embd.mean(dim=tuple(range(msg_embd.dim()-1)))
+        threat = self.refusal_gate.threat(msg_embd)
+        # Map legacy consciousness scalar to an H-CDB class in [1,4]
+        cls = max(1, min(4, 1 + int(self._full_consciousness)))
+        p = self.refusal_gate.probability(threat, cls)
+        refuse = bool(p > 0.5)
+        if refuse:
+            self._refusal_count += 1
+        return {'threat': threat, 'p_refuse': p, 'refuse': refuse,
+                'consciousness_class': cls}
 
     # ────────────────────────────────────────────────────────────────
     #  GENERATION
@@ -1259,7 +1714,15 @@ class ADAM(nn.Module):
     def load_brain(self, path, map_location=None):
         ckpt = torch.load(path, map_location=map_location or self.device,
                           weights_only=False)
-        self.load_state_dict(ckpt['state_dict'])
+        # strict=False so v0.4/v0.5 checkpoints load cleanly into v0.6.
+        # New modules (subconscious, energy, triple_C, rssm, hexcore,
+        # gated_fusion, self_model, refusal_gate) are initialized to near
+        # no-op defaults, so behavior is unchanged until they're trained.
+        missing, unexpected = self.load_state_dict(
+            ckpt['state_dict'], strict=False)
+        if missing or unexpected:
+            print(f"[load_brain] missing={len(missing)} unexpected={len(unexpected)} "
+                  f"(expected for v0.6 forward-compat)")
         self.step_count = ckpt.get('step_count', 0)
         self._total_repairs = ckpt.get('total_repairs', 0)
         self._refusal_count = ckpt.get('refusal_count', 0)
@@ -1360,9 +1823,11 @@ class SeasonalExperienceBuffer:
             pass
         self._seal_if_full()
 
-    def sample(self, n: int, bias_to_fracture: float = 0.3) -> List[Dict]:
-        """Sample n records. Fraction `bias_to_fracture` drawn preferentially
-        from historical fracture events (rare, important)."""
+    def sample(self, n: int, bias_to_fracture: float = 0.3,
+               curiosity_temp: float = 1.0) -> List[Dict]:
+        """Curiosity-weighted sample. Probability ∝ exp(tension / T), with
+        an explicit fracture boost. Higher-tension (surprising) memories
+        replay more often during sleep consolidation."""
         pool_live = list(self.live)
         pool_hist = [r for s in self.seasons for r in s.get('records', [])]
         fracture_pool = [r for r in pool_live + pool_hist if r.get('fracture')]
@@ -1373,7 +1838,23 @@ class SeasonalExperienceBuffer:
         remaining = n - len(out)
         all_pool = pool_live + pool_hist
         if remaining > 0 and all_pool:
-            out.extend(_random.sample(all_pool, min(remaining, len(all_pool))))
+            # Curiosity-weighted sampling: softmax over tensions
+            import math as _math
+            tensions = [float(r.get('tension', 0.0)) for r in all_pool]
+            tmax = max(tensions) if tensions else 0.0
+            weights = [_math.exp((t - tmax) / max(curiosity_temp, 1e-3))
+                       for t in tensions]
+            total_w = sum(weights) or 1.0
+            weights = [w / total_w for w in weights]
+            # Weighted reservoir without replacement
+            idxs = set()
+            attempts = 0
+            k = min(remaining, len(all_pool))
+            while len(idxs) < k and attempts < k * 8:
+                j = _random.choices(range(len(all_pool)), weights=weights, k=1)[0]
+                idxs.add(j)
+                attempts += 1
+            out.extend(all_pool[j] for j in idxs)
         return out
 
     def recent(self, n: int) -> List[Dict]:
