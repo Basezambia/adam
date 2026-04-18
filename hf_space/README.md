@@ -7,7 +7,7 @@ sdk: docker
 app_port: 8000
 pinned: true
 license: mit
-short_description: Interactive demo of ADAM — brain-like memory, live emotion, approval-gated learning
+short_description: Interactive demo of ADAM — the alive transformer
 ---
 
 # ADAM — A Dynamical Alive Mind

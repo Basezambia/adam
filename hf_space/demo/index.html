@@ -153,6 +153,7 @@
   <button data-tab="memory">⑧ Memory Probe</button>
   <button data-tab="arcade">⑨ H-CDB Arcade</button>
   <button data-tab="learn">⑩ Alive Learning</button>
+  <button data-tab="web">⑪ Live Web Learn</button>
 </nav>
 
 <main>
@@ -484,6 +485,75 @@
       <button class="btn alt" onclick="saveSnap()">Save brain snapshot</button>
     </div>
     <div class="log" id="learnLog" style="max-height:280px;margin-top:12px"></div>
+  </div>
+</div>
+
+<!-- ═══════════════ ⑪ LIVE WEB LEARN ═══════════════ -->
+<div class="demo" data-demo="web">
+  <div class="card">
+    <h2 style="margin:0 0 6px">Live Web Learning</h2>
+    <p class="muted" style="margin:0 0 14px">
+      Give ADAM a URL. It fetches, cleans, chunks, and feeds each chunk to
+      <code>ContinualLearner.wake_tick()</code> live. Weights move per chunk,
+      anchored to the pre-trained anchor (EWC) so nothing is forgotten.
+      Novelty-fracture events boost the learning rate 10×.
+    </p>
+
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+      <input id="web_input" type="text"
+             placeholder="arxiv:2401.12345   wiki:Holography   https://example.com/post"
+             style="flex:1; min-width:280px; padding:8px 10px;
+                    background:#0d1117; color:#e6edf3; border:1px solid #30363d;
+                    border-radius:6px; font:13px/1.4 ui-monospace,monospace" />
+      <button class="btn" onclick="webLearn()">Start learning</button>
+      <button class="btn alt" onclick="webPause()">Pause</button>
+      <button class="btn alt" onclick="webResume()">Resume</button>
+      <button class="btn alt" onclick="webStop()">Stop current</button>
+    </div>
+
+    <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap">
+      <span class="muted" style="font-size:12px">Quick-pick:</span>
+      <button class="btn alt chip" onclick="webQuick('wiki:Transformer_(deep_learning_architecture)')">wiki: Transformer</button>
+      <button class="btn alt chip" onclick="webQuick('wiki:Holography')">wiki: Holography</button>
+      <button class="btn alt chip" onclick="webQuick('wiki:Hebbian_theory')">wiki: Hebbian</button>
+      <button class="btn alt chip" onclick="webQuick('arxiv:1706.03762')">arxiv: Attention Is All You Need</button>
+      <button class="btn alt chip" onclick="webQuick('arxiv:2301.04104')">arxiv: DreamerV3</button>
+    </div>
+
+    <div class="miniStrip" style="margin-top:14px">
+      <div class="mm"><span class="k">job</span><span class="v" id="web_job">—</span></div>
+      <div class="mm"><span class="k">status</span><span class="v" id="web_status">idle</span></div>
+      <div class="mm"><span class="k">chunks</span><span class="v" id="web_chunks">0 / 0</span></div>
+      <div class="mm"><span class="k">loss</span><span class="v" id="web_loss">—</span></div>
+      <div class="mm"><span class="k">z-score</span><span class="v" id="web_z">—</span></div>
+      <div class="mm"><span class="k">fractures</span><span class="v" id="web_frac">0</span></div>
+      <div class="mm"><span class="k">lr</span><span class="v" id="web_lr">—</span></div>
+    </div>
+
+    <svg id="web_plot" width="100%" height="180" style="background:#0d1117;
+         border:1px solid #30363d; border-radius:6px; margin-top:12px"></svg>
+    <div class="muted" style="font-size:11px; margin-top:4px">
+      loss per chunk (blue) · fractures marked (amber)
+    </div>
+
+    <h3 style="margin:16px 0 6px">Event log</h3>
+    <div class="log" id="web_log" style="max-height:260px"></div>
+
+    <h3 style="margin:16px 0 6px">Recall probe</h3>
+    <p class="muted" style="margin:0 0 8px">
+      After ingesting, prompt ADAM to see if its next-token distribution
+      actually shifted toward what it just read.
+    </p>
+    <div style="display:flex; gap:8px">
+      <input id="web_recall_q" type="text" value="Holography is a technique that"
+             style="flex:1; padding:8px 10px; background:#0d1117; color:#e6edf3;
+                    border:1px solid #30363d; border-radius:6px;
+                    font:13px/1.4 ui-monospace,monospace" />
+      <button class="btn" onclick="webRecall()">Probe</button>
+    </div>
+    <pre id="web_recall_out" style="margin-top:10px; padding:10px; background:#0d1117;
+         border:1px solid #30363d; border-radius:6px; white-space:pre-wrap;
+         color:#c9d1d9; min-height:60px"></pre>
   </div>
 </div>
 
@@ -1137,6 +1207,120 @@ function log(sel, html){
   el.appendChild(d); el.scrollTop = el.scrollHeight;
 }
 function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+
+/* ─── LIVE WEB LEARN ─── */
+let WEB_SSE=null, WEB_CURRENT_JOB=null, WEB_LOSSES=[], WEB_FRACS=[];
+
+function webStartSSE(){
+  if(WEB_SSE) return;
+  try{
+    WEB_SSE = new EventSource(API+'/learn/stream');
+    WEB_SSE.onmessage = ev => {
+      try{
+        const d = JSON.parse(ev.data);
+        webHandleEvent(d);
+      }catch(e){}
+    };
+    WEB_SSE.onerror = () => {
+      // auto-reconnect via EventSource retry; surface a muted note
+      const el = document.getElementById('web_log');
+      if(el && !el.dataset.disconnected){
+        log('#web_log', '<span style="color:#fbbf24">stream reconnecting…</span>');
+        el.dataset.disconnected='1';
+        setTimeout(()=>{ el.dataset.disconnected=''; }, 2000);
+      }
+    };
+  }catch(e){ toast('SSE not available'); }
+}
+
+function webHandleEvent(d){
+  const j = d.job_id;
+  if(d.type==='queued') log('#web_log', `<span style="color:#7ee787">[queued]</span> job <b>${j}</b> → ${esc(d.target)}`);
+  else if(d.type==='fetching') log('#web_log', `<span style="color:#58a6ff">[fetching]</span> ${esc(d.target)}…`);
+  else if(d.type==='fetched'){
+    WEB_CURRENT_JOB = j;
+    WEB_LOSSES = []; WEB_FRACS = [];
+    $('#web_job').textContent = `#${j}`;
+    $('#web_status').textContent = 'learning';
+    $('#web_chunks').textContent = `0 / ${d.chunks}`;
+    $('#web_frac').textContent = '0';
+    log('#web_log', `<span style="color:#a5f3fc">[fetched]</span> <b>${esc(d.title)}</b> — ${d.chars} chars → ${d.chunks} chunks`);
+  }
+  else if(d.type==='tick'){
+    if(j!==WEB_CURRENT_JOB) return;
+    WEB_LOSSES.push(d.loss);
+    if(d.fracture) WEB_FRACS.push(WEB_LOSSES.length-1);
+    $('#web_chunks').textContent = `${d.chunk_idx+1} / ${d.total_chunks}`;
+    $('#web_loss').textContent = f3(d.loss);
+    $('#web_z').textContent = f2(d.z);
+    $('#web_lr').textContent = d.lr.toExponential(1);
+    $('#web_frac').textContent = WEB_FRACS.length;
+    webDrawPlot();
+    if(d.fracture) log('#web_log',
+      `<span style="color:#fbbf24">⚡ FRACTURE</span> z=${f2(d.z)} loss=${f3(d.loss)} — <span class="muted">${esc(d.text_preview)}</span>`);
+  }
+  else if(d.type==='done'){
+    if(j===WEB_CURRENT_JOB) $('#web_status').textContent = 'done';
+    log('#web_log', `<span style="color:#7ee787">[done]</span> job ${j} — final_loss=${f3(d.final_loss)} fractures=${d.fracture_events}`);
+  }
+  else if(d.type==='error'){
+    if(j===WEB_CURRENT_JOB) $('#web_status').textContent = 'error';
+    log('#web_log', `<span style="color:#f87171">[error]</span> job ${j} — ${esc(d.error)}`);
+  }
+  else if(d.type==='cancelled'){
+    if(j===WEB_CURRENT_JOB) $('#web_status').textContent = 'cancelled';
+    log('#web_log', `<span style="color:#f87171">[cancelled]</span> job ${j}`);
+  }
+}
+
+function webDrawPlot(){
+  const svg = document.getElementById('web_plot'); if(!svg) return;
+  const W = svg.clientWidth || 600, H = 180;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  const pad = 20;
+  const n = WEB_LOSSES.length;
+  if(n===0){ svg.innerHTML=''; return; }
+  const lo = Math.min(...WEB_LOSSES), hi = Math.max(...WEB_LOSSES);
+  const range = Math.max(1e-3, hi - lo);
+  const x = i => pad + (W-2*pad) * (n>1 ? i/(n-1) : 0.5);
+  const y = v => H-pad - (H-2*pad) * (v-lo)/range;
+  let path = '';
+  WEB_LOSSES.forEach((v,i) => { path += (i?' L ':'M ') + x(i).toFixed(1) + ' ' + y(v).toFixed(1); });
+  const fracMarks = WEB_FRACS.map(i =>
+    `<line x1="${x(i)}" x2="${x(i)}" y1="${pad}" y2="${H-pad}" stroke="#fbbf24" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>`
+  ).join('');
+  svg.innerHTML = `
+    <g>${fracMarks}</g>
+    <path d="${path}" fill="none" stroke="#58a6ff" stroke-width="1.5"/>
+    <text x="${W-pad}" y="${pad-4}" fill="#8b949e" font-size="10" text-anchor="end">max ${f3(hi)}</text>
+    <text x="${W-pad}" y="${H-pad+12}" fill="#8b949e" font-size="10" text-anchor="end">min ${f3(lo)}</text>
+  `;
+}
+
+async function webLearn(){
+  const t = $('#web_input').value.trim();
+  if(!t){ toast('enter a URL, arxiv:ID, or wiki:Title'); return; }
+  webStartSSE();
+  try{
+    const d = await apiJSON('/learn/url', {target: t});
+    log('#web_log', `<span style="color:#7ee787">→ queued</span> job ${d.job_id}`);
+  }catch(e){}
+}
+function webQuick(t){ $('#web_input').value = t; webLearn(); }
+async function webPause(){ await api('/learn/pause',{method:'POST'}); $('#web_status').textContent='paused'; }
+async function webResume(){ await api('/learn/resume',{method:'POST'}); $('#web_status').textContent='learning'; }
+async function webStop(){ await api('/learn/stop',{method:'POST'}); }
+async function webRecall(){
+  const q = $('#web_recall_q').value;
+  $('#web_recall_out').textContent = '… sampling …';
+  try{
+    const d = await apiJSON('/learn/recall', {query: q, max_tokens: 80});
+    $('#web_recall_out').textContent = (d.completion ? (q + d.completion) : ('error: '+d.error));
+  }catch(e){ $('#web_recall_out').textContent = 'error'; }
+}
+
+// Auto-subscribe to the SSE stream when the tab is opened
+document.querySelector('nav button[data-tab="web"]').addEventListener('click', webStartSSE);
 </script>
 </body>
 </html>

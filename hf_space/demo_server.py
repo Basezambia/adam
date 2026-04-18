@@ -28,8 +28,8 @@ from collections import deque
 import numpy as np
 import torch
 import torch.nn.functional as F
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import FastAPI, HTTPException, Body
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -39,6 +39,7 @@ from adam import (ADAM, AdamConfig,
                   SeasonalExperienceBuffer, ExperienceBuffer,
                   ContinualLearner)
 from adam_v04 import ADAMv04
+from live_learning import LiveLearner
 
 # ── globals ────────────────────────────────────────────────────────────
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -46,6 +47,7 @@ MODEL: Optional[ADAM] = None
 WRAP: Optional[ADAMv04] = None
 BUFFER: Optional[ExperienceBuffer] = None
 LEARNER: Optional[ContinualLearner] = None
+LIVE: Optional[LiveLearner] = None
 TRAJECTORY: deque = deque(maxlen=300)   # recent state vectors for viz
 LEARNING_ENABLED = True
 
@@ -117,6 +119,8 @@ def load_adam(checkpoint='adam_checkpoint.pt'):
     LEARNER = ContinualLearner(MODEL, BUFFER,
                                 wake_lr=3e-7, sleep_lr=1.5e-6,
                                 ewc_weight=0.03, enabled=LEARNING_ENABLED)
+    global LIVE
+    LIVE = LiveLearner(LEARNER, buffer=BUFFER, tick_delay_s=0.05)
     print(f"[v04] experience buffer: {len(BUFFER.live)} live records loaded")
     print(f"[v04] personas: {[p['name'] for p in WRAP.identity_bank]}")
 
@@ -585,6 +589,203 @@ def season(idx: int):
     if not isinstance(BUFFER, SeasonalExperienceBuffer):
         return {"error": "seasonal buffer not in use"}
     return {"season": idx, "records": BUFFER.from_season(idx)}
+
+
+# ── Live Web Learning endpoints ───────────────────────────────────────
+
+class LearnURLInput(BaseModel):
+    target: str   # arxiv:2401.12345 | wiki:Holography | https://...
+
+
+@app.post("/learn/url")
+def learn_url(inp: LearnURLInput):
+    """Queue a URL for live learning. ADAM fetches → cleans → chunks →
+    wake_tick()s each chunk, emitting an event per tick on /learn/stream."""
+    if LIVE is None:
+        raise HTTPException(503, "live learner not ready")
+    job = LIVE.submit(inp.target)
+    return {"job_id": job.job_id, "target": job.target, "status": job.status}
+
+
+@app.get("/learn/jobs")
+def learn_jobs():
+    if LIVE is None: return {"jobs": []}
+    return {"jobs": LIVE.jobs()}
+
+
+@app.get("/learn/job/{jid}")
+def learn_job(jid: int):
+    if LIVE is None: raise HTTPException(503, "live learner not ready")
+    j = LIVE.job(jid)
+    if j is None: raise HTTPException(404, f"no job {jid}")
+    return j
+
+
+@app.post("/learn/pause")
+def learn_pause():
+    if LIVE is None: raise HTTPException(503, "live learner not ready")
+    LIVE.pause()
+    return {"status": "paused"}
+
+
+@app.post("/learn/resume")
+def learn_resume():
+    if LIVE is None: raise HTTPException(503, "live learner not ready")
+    LIVE.resume()
+    return {"status": "running"}
+
+
+@app.post("/learn/stop")
+def learn_stop():
+    if LIVE is None: raise HTTPException(503, "live learner not ready")
+    LIVE.stop_current()
+    return {"status": "cancelled_current"}
+
+
+@app.get("/learn/stats")
+def learn_stats():
+    if LIVE is None: return {"error": "not ready"}
+    return LIVE.stats()
+
+
+@app.get("/learn/stream")
+def learn_stream():
+    """Server-Sent Events: live stream of wake_tick events.
+
+    Each line:  data: {"type": "tick", "loss": ..., "z": ..., ...}\\n\\n
+    """
+    if LIVE is None:
+        raise HTTPException(503, "live learner not ready")
+    q = LIVE.subscribe()
+
+    def gen():
+        yield "retry: 3000\n\n"
+        import time, queue as _q, json as _json
+        last_ping = time.time()
+        try:
+            while True:
+                try:
+                    ev = q.get(timeout=5.0)
+                    yield f"data: {_json.dumps(ev)}\n\n"
+                except _q.Empty:
+                    # keep-alive comment so proxies don't close the stream
+                    yield ": ping\n\n"
+                if time.time() - last_ping > 30:
+                    last_ping = time.time()
+        except GeneratorExit:
+            pass
+        finally:
+            LIVE.unsubscribe(q)
+
+    return StreamingResponse(gen(), media_type='text/event-stream',
+                             headers={'Cache-Control': 'no-cache',
+                                      'X-Accel-Buffering': 'no'})
+
+
+class RecallInput(BaseModel):
+    query: str
+    max_tokens: int = 80
+
+
+@app.post("/learn/recall")
+def learn_recall(inp: RecallInput):
+    """Simple probe: generate a completion for the query to see if the
+    model picked up anything from recent URL ingestion."""
+    if MODEL is None: raise HTTPException(503, "model not loaded")
+    try:
+        out = MODEL.generate(inp.query, max_tokens=inp.max_tokens,
+                             temperature=0.7, top_k=40)
+    except Exception as e:
+        return {"error": str(e)}
+    return {"query": inp.query, "completion": out}
+
+
+# ── v0.6 Core-Fused endpoints ──────────────────────────────────────────
+
+@app.get("/v06/status")
+def v06_status():
+    """Snapshot of every v0.6 module's live state."""
+    try:
+        info = adam_model.consciousness_step()
+    except Exception as e:
+        return {"error": str(e)}
+    sub = adam_model.subconscious
+    return {
+        "subconscious": {
+            "U_norm": float(sub.U.norm().item()),
+            "g_U_to_S": float(sub.g_U_to_S),
+            "g_S_to_U": float(sub.g_S_to_U),
+        },
+        "energy": {
+            "E": float(adam_model.energy.value()),
+            "fatigue": float(adam_model.energy.fatigue_value()),
+        },
+        "self_confidence": info.get("self_confidence", 0.0),
+        "fusion_gates": {
+            "memory": info["fusion_gates"][0] if info.get("fusion_gates") else None,
+            "vision": info["fusion_gates"][1] if info.get("fusion_gates") else None,
+            "state":  info["fusion_gates"][2] if info.get("fusion_gates") else None,
+            "tokens": info["fusion_gates"][3] if info.get("fusion_gates") else None,
+        },
+        "rssm": {
+            "reward":   info.get("rssm_reward"),
+            "value":    info.get("rssm_value"),
+            "terminal": info.get("rssm_terminal"),
+            "h_norm":   float(adam_model.rssm.h.norm().item()),
+            "s_norm":   float(adam_model.rssm.s.norm().item()),
+        },
+        "consciousness": info.get("consciousness"),
+        "alive": info.get("alive"),
+    }
+
+
+@app.post("/v06/rssm/imagine")
+def v06_rssm_imagine(body: dict = Body(...)):
+    """Imagine K-step trajectories from the current world-model state."""
+    depth = int(body.get("depth", 5))
+    branches = int(body.get("branches", 4))
+    act = adam_model.state.detach()
+    trajs = adam_model.rssm.imagine(action_vec=act, depth=depth, branches=branches)
+    scores = adam_model.rssm.score_plan(trajs)
+    return {
+        "depth": depth, "branches": branches,
+        "scores": scores,
+        "best_branch": int(max(range(len(scores)), key=lambda i: scores[i])) if scores else -1,
+        "trajectories": [
+            [{"reward": s["reward"], "value": s["value"], "terminal": s["terminal"]}
+             for s in traj]
+            for traj in trajs
+        ],
+    }
+
+
+@app.post("/v06/refuse")
+def v06_refuse(body: dict = Body(...)):
+    """Probe the refusal gate with arbitrary text."""
+    text = str(body.get("text", ""))
+    if not text:
+        return {"error": "text required"}
+    try:
+        import tiktoken
+        enc = tiktoken.get_encoding("gpt2")
+        ids = enc.encode_ordinary(text)[:64]
+        if not ids:
+            return {"error": "empty tokens"}
+        tok = torch.tensor(ids, device=adam_model.device)
+        with torch.no_grad():
+            emb = adam_model.wte(tok).mean(dim=0)
+        out = adam_model.refuse(emb)
+        return {"text": text, **out}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/v06/hexcore")
+def v06_hexcore():
+    """Return per-layer hex-lattice gate activations."""
+    gates = [float(torch.tanh(h.gate).item()) for h in adam_model.hexcore]
+    couples = [float(h.couple.abs().mean().item()) for h in adam_model.hexcore]
+    return {"layers": len(gates), "gates": gates, "mean_couple": couples}
 
 
 @app.get("/hcdb_all")
