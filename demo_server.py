@@ -727,6 +727,39 @@ def sudoku_solve(body: dict = Body(...)):
         return {"ok": False, "error": "no solution"}
     return {"ok": True, "solution": sol, "pretty": pretty(sol)}
 
+@app.post("/sudoku/explain")
+def sudoku_explain(body: dict = Body(...)):
+    """Step-by-step solve with human-readable reasoning per cell.
+
+    Backtracker does the solving (always correct); ADAM optionally adds
+    an opening narration line in its own voice.
+    """
+    from sudoku_dataset import solve_with_steps
+    s = str(body.get("puzzle", "")).strip().replace(" ", "").replace("\n", "")
+    if len(s) != 81:
+        raise HTTPException(400, "puzzle must be 81 chars")
+    narrate = bool(body.get("narrate", True))
+    steps, final = solve_with_steps(s)
+
+    opener = None
+    if narrate and MODEL is not None:
+        try:
+            prompt = (f"I am ADAM. Looking at this sudoku puzzle with "
+                      f"{sum(1 for ch in s if ch=='.')} empty cells, my approach is")
+            opener = MODEL.generate(prompt, max_tokens=28,
+                                     temperature=0.8, top_k=40)
+            opener = opener.split('\n')[0].strip()
+        except Exception:
+            opener = None
+
+    return {
+        "puzzle": s,
+        "final": final,
+        "n_steps": len(steps),
+        "steps": steps,
+        "narration": opener,
+    }
+
 @app.post("/sudoku/adam_solve")
 def sudoku_adam_solve(body: dict = Body(...)):
     """Ask ADAM to solve — greedy decode from the learned distribution."""

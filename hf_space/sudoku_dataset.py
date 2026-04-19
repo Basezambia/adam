@@ -126,6 +126,106 @@ def pretty(board_or_str) -> str:
     return "\n".join(lines)
 
 
+def _candidates(board, r, c):
+    if board[r][c] != 0:
+        return set()
+    used = set()
+    for i in range(9):
+        used.add(board[r][i]); used.add(board[i][c])
+    br, bc = 3 * (r // 3), 3 * (c // 3)
+    for i in range(br, br + 3):
+        for j in range(bc, bc + 3):
+            used.add(board[i][j])
+    return set(range(1, 10)) - used
+
+
+def _row_set(board, r): return {board[r][c] for c in range(9) if board[r][c]}
+def _col_set(board, c): return {board[r][c] for r in range(9) if board[r][c]}
+def _box_set(board, r, c):
+    br, bc = 3 * (r // 3), 3 * (c // 3)
+    return {board[i][j] for i in range(br, br+3) for j in range(bc, bc+3) if board[i][j]}
+
+
+def solve_with_steps(puzzle_str: str, max_steps: int = 81):
+    """Step-by-step logical solver. Returns list of step dicts:
+      {row, col, value, strategy, row_has, col_has, box_has, why}
+    Uses naked-single + hidden-single + fallback backtrack.
+    """
+    board = str_to_board(puzzle_str)
+    steps = []
+    made_progress = True
+    while made_progress and len(steps) < max_steps:
+        made_progress = False
+        # naked single: cell has exactly one candidate
+        for r in range(9):
+            for c in range(9):
+                if board[r][c] == 0:
+                    cand = _candidates(board, r, c)
+                    if len(cand) == 1:
+                        v = cand.pop()
+                        row_has = sorted(_row_set(board, r))
+                        col_has = sorted(_col_set(board, c))
+                        box_has = sorted(_box_set(board, r, c))
+                        board[r][c] = v
+                        steps.append({
+                            "row": r, "col": c, "value": v,
+                            "strategy": "naked single",
+                            "row_has": row_has, "col_has": col_has, "box_has": box_has,
+                            "why": (f"row {r+1} contains {row_has}, col {c+1} contains {col_has}, "
+                                    f"box contains {box_has}. Only {v} is left for ({r+1},{c+1})."),
+                        })
+                        made_progress = True
+                        break
+            if made_progress:
+                break
+        if made_progress:
+            continue
+        # hidden single: a digit can only go in one cell in a row/col/box
+        found = False
+        for unit_kind in ("row", "col", "box"):
+            for idx in range(9):
+                for v in range(1, 10):
+                    positions = []
+                    if unit_kind == "row":
+                        for c in range(9):
+                            if board[idx][c] == 0 and v in _candidates(board, idx, c):
+                                positions.append((idx, c))
+                    elif unit_kind == "col":
+                        for r in range(9):
+                            if board[r][idx] == 0 and v in _candidates(board, r, idx):
+                                positions.append((r, idx))
+                    else:
+                        br, bc = 3 * (idx // 3), 3 * (idx % 3)
+                        for r in range(br, br+3):
+                            for c in range(bc, bc+3):
+                                if board[r][c] == 0 and v in _candidates(board, r, c):
+                                    positions.append((r, c))
+                    if len(positions) == 1:
+                        r, c = positions[0]
+                        row_has = sorted(_row_set(board, r))
+                        col_has = sorted(_col_set(board, c))
+                        box_has = sorted(_box_set(board, r, c))
+                        board[r][c] = v
+                        steps.append({
+                            "row": r, "col": c, "value": v,
+                            "strategy": f"hidden single ({unit_kind})",
+                            "row_has": row_has, "col_has": col_has, "box_has": box_has,
+                            "why": (f"{v} can only fit at ({r+1},{c+1}) in this {unit_kind} "
+                                    f"— every other empty cell already has {v} blocked."),
+                        })
+                        made_progress = True
+                        found = True
+                        break
+                if found: break
+            if found: break
+        if found:
+            continue
+    # backtrack to finish if needed
+    if _find_empty(board) is not None:
+        solve(board)  # completes remaining without step logging
+    return steps, board_to_str(board)
+
+
 def training_example(clues: int = 36) -> str:
     puzzle, solution = make_puzzle(clues=clues)
     return f"sudoku puzzle: {board_to_str(puzzle)} solution: {board_to_str(solution)}"
