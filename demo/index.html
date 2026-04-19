@@ -2,578 +2,1295 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>ADAM v0.5 — A Dynamical Alive Mind · Research Demo</title>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>ADAM — A Dynamical Alive Mind</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@300;400;500&display=swap">
 <style>
-  :root{
-    --bg:#0a0a0f;--panel:#12121a;--ink:#e8e8f0;--dim:#8a8aa0;
-    --accent:#6ee7ff;--warn:#ffb86b;--ok:#8bff8b;--bad:#ff6b8b;
-    --grey:#555566;--orange:#ff9b4d;--yellow:#ffe066;
-    --border:#20202c;--mono:ui-monospace,"JetBrains Mono",Menlo,monospace;
-  }
-  *{box-sizing:border-box}
-  html,body{margin:0;background:var(--bg);color:var(--ink);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;
-    font-size:14px;min-height:100vh}
-  header{padding:18px 24px;border-bottom:1px solid var(--border);
-    display:flex;justify-content:space-between;align-items:center;gap:16px}
-  h1{margin:0;font-weight:700;font-size:20px;letter-spacing:.3px}
-  h1 span{color:var(--accent)}
-  .tag{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:1.2px}
-  nav{display:flex;gap:2px;padding:0 20px;border-bottom:1px solid var(--border);
-    background:var(--bg);position:sticky;top:0;z-index:10;overflow-x:auto}
-  nav button{background:none;border:0;color:var(--dim);padding:13px 14px;
-    cursor:pointer;font-family:inherit;font-size:12.5px;white-space:nowrap;
-    border-bottom:2px solid transparent;transition:all .15s}
-  nav button.active{color:var(--accent);border-bottom-color:var(--accent)}
-  nav button:hover{color:var(--ink)}
-  main{padding:16px 24px 60px;max-width:1320px;margin:0 auto}
+:root{
+  --bg-deep:   #0e0803;
+  --bg:        #17100a;
+  --bg-soft:   #221711;
+  --surface:   #2a1d13;
+  --surface-hi:#38281c;
+  --line:      rgba(212,165,116,0.10);
+  --border:    rgba(212,165,116,0.22);
+  --border-hi: rgba(212,165,116,0.45);
+  --text:      #f2e6d1;
+  --text-dim:  #b4a28b;
+  --text-mute: #80705c;
+  --milk:      #ead8bc;
+  --caramel:   #d4a574;
+  --champagne: #e8c89c;
+  --amber:     #f5a35e;
+  --sage:      #a3b88a;
+  --rose:      #d88a8a;
+  --serif: 'Instrument Serif', 'Cormorant Garamond', ui-serif, Georgia, serif;
+  --sans:  'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --mono:  'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--sans); font-weight:300; font-size:15px; line-height:1.6;
+  color:var(--text); background:var(--bg-deep);
+  overflow-x:hidden; letter-spacing:0.01em;
+  background:
+    radial-gradient(ellipse at 20% 0%, rgba(212,165,116,0.08), transparent 60%),
+    radial-gradient(ellipse at 80% 100%, rgba(139,111,71,0.06), transparent 60%),
+    var(--bg-deep);
+}
+a{color:var(--caramel); text-decoration:none; transition:color .3s}
+a:hover{color:var(--champagne)}
 
-  /* compact per-tab header */
-  .miniStrip{display:flex;gap:14px;flex-wrap:wrap;align-items:center;
-    margin:0 0 18px;padding:10px 14px;background:var(--panel);
-    border:1px solid var(--border);border-radius:8px}
-  .mm{display:flex;align-items:center;gap:8px}
-  .mm .k{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:1px}
-  .mm .v{font-family:var(--mono);font-size:14px}
-  .mm .v.ok{color:var(--ok)} .mm .v.bad{color:var(--bad)} .mm .v.warn{color:var(--warn)}
-  .mm svg.spark{display:block}
+/* ─── film-grain overlay (subtle) ─── */
+body::after{
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:1;
+  opacity:.035; mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
 
-  .demo{display:none} .demo.active{display:block}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
-  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-  .grid4{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
-  @media(max-width:880px){.grid2,.grid3,.grid4{grid-template-columns:1fr}}
+/* ─── three.js canvas ─── */
+#hero-canvas{
+  position:fixed; top:0; left:0; width:100vw; height:100vh;
+  z-index:0; pointer-events:none;
+  transition:opacity .6s ease;
+}
 
-  .card{background:var(--panel);border:1px solid var(--border);
-    border-radius:12px;padding:16px 18px;margin-bottom:14px}
-  .card h3{margin:0 0 8px;font-size:13px;letter-spacing:.5px;
-    text-transform:uppercase;color:var(--accent)}
-  .card h4{margin:0 0 6px;font-size:12px;color:var(--accent);
-    text-transform:uppercase;letter-spacing:.6px}
-  .card p.hint{color:var(--dim);font-size:12.5px;margin:0 0 12px;line-height:1.5}
-  .card p.caption{color:var(--dim);font-size:12px;margin:10px 0 0;font-style:italic}
+/* ─── top navigation bar ─── */
+.top-nav{
+  position:fixed; top:0; left:0; right:0; z-index:50;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:18px 32px; backdrop-filter:blur(8px);
+  background:linear-gradient(to bottom, rgba(14,8,3,0.7), transparent);
+  transition:padding .3s ease;
+}
+.top-nav.compact{padding:10px 32px; background:rgba(14,8,3,0.85); border-bottom:1px solid var(--line)}
+.brand{
+  display:flex; align-items:center; gap:10px;
+  font-family:var(--serif); font-size:22px; color:var(--milk);
+  font-style:italic; letter-spacing:0.02em;
+}
+.brand::before{
+  content:''; width:10px; height:10px; border-radius:50%;
+  background:radial-gradient(circle at 30% 30%, var(--champagne), var(--caramel) 60%, #5a3818);
+  box-shadow: 0 0 12px rgba(232,200,156,0.5);
+  animation:pulse 3s ease-in-out infinite;
+}
+@keyframes pulse{
+  0%,100%{transform:scale(1); box-shadow:0 0 12px rgba(232,200,156,0.5)}
+  50%{transform:scale(1.15); box-shadow:0 0 22px rgba(232,200,156,0.8)}
+}
+.brand-sub{
+  font-family:var(--mono); font-size:10px; color:var(--text-mute);
+  text-transform:uppercase; letter-spacing:.2em; margin-left:2px;
+}
+.top-nav .links{display:flex; gap:22px; align-items:center}
+.top-nav .links a{
+  font-family:var(--mono); font-size:11px; color:var(--text-dim);
+  text-transform:uppercase; letter-spacing:.18em; transition:all .3s;
+}
+.top-nav .links a:hover{color:var(--caramel)}
+.status-dot{
+  display:inline-flex; align-items:center; gap:6px;
+  font-family:var(--mono); font-size:10px; color:var(--text-mute);
+}
+.status-dot::before{
+  content:''; width:6px; height:6px; border-radius:50%; background:var(--sage);
+  box-shadow: 0 0 6px var(--sage);
+}
+.status-dot.off::before{background:var(--rose); box-shadow:0 0 6px var(--rose)}
 
-  textarea,input[type=text],input[type=number],select{width:100%;background:#090910;color:var(--ink);
-    border:1px solid var(--border);border-radius:6px;padding:9px 10px;
-    font-family:var(--mono);font-size:13px;outline:none}
-  textarea{min-height:64px;resize:vertical}
-  textarea:focus,input:focus,select:focus{border-color:var(--accent)}
-  input[type=range]{accent-color:var(--accent)}
+/* ─── section scaffold ─── */
+.sect{
+  position:relative; z-index:2;
+  min-height:100vh; display:flex; align-items:center; justify-content:center;
+  padding:100px 32px; max-width:100vw;
+}
+.sect-inner{max-width:960px; width:100%; margin:0 auto}
+.sect.wide .sect-inner{max-width:1200px}
 
-  button.btn{background:var(--accent);color:#001218;border:0;padding:8px 14px;
-    border-radius:6px;font-weight:600;cursor:pointer;font-family:inherit;
-    font-size:12.5px;transition:transform .08s}
-  button.btn:hover{transform:translateY(-1px)}
-  button.btn.alt{background:transparent;border:1px solid var(--border);color:var(--ink)}
-  button.btn.good{background:var(--ok);color:#002200}
-  button.btn.bad{background:var(--bad);color:#3a0010}
-  button.btn:disabled{opacity:.4;cursor:not-allowed}
-  .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
+/* ─── reveal animation ─── */
+.reveal{
+  opacity:0; transform:translateY(40px) scale(.97);
+  transition: opacity .9s var(--ease-out), transform 1.1s var(--ease-out);
+  will-change:opacity, transform;
+}
+.reveal.in{opacity:1; transform:translateY(0) scale(1)}
+.reveal.delay-1{transition-delay:.12s}
+.reveal.delay-2{transition-delay:.24s}
+.reveal.delay-3{transition-delay:.36s}
+.reveal.delay-4{transition-delay:.48s}
 
-  .log{background:#070710;border:1px solid var(--border);border-radius:6px;
-    padding:10px 12px;font-family:var(--mono);font-size:12px;
-    max-height:280px;overflow-y:auto;margin-top:10px;color:var(--dim)}
-  .log .line{padding:3px 0;border-bottom:1px dashed #20202c}
-  .log .line:last-child{border-bottom:0}
-  .log b{color:var(--ink)}
+/* ─── hero ─── */
+#hero{min-height:100vh; padding-top:0}
+.hero-inner{text-align:center; position:relative}
+.hero-eyebrow{
+  font-family:var(--mono); font-size:11px; color:var(--caramel);
+  text-transform:uppercase; letter-spacing:.4em; margin-bottom:30px;
+  opacity:.8;
+}
+.hero-title{
+  font-family:var(--serif); font-weight:400;
+  font-size:clamp(54px, 11vw, 148px); line-height:0.95;
+  letter-spacing:-0.015em; color:var(--milk); margin:0 0 8px;
+  background:linear-gradient(180deg, var(--milk), var(--champagne) 55%, var(--caramel));
+  -webkit-background-clip:text; background-clip:text;
+  -webkit-text-fill-color:transparent; color:transparent;
+}
+.hero-title em{font-style:italic; color:var(--caramel); -webkit-text-fill-color:var(--caramel)}
+.hero-sub{
+  font-family:var(--serif); font-style:italic; font-weight:400;
+  font-size:clamp(18px,2.6vw,26px); color:var(--text-dim);
+  max-width:660px; margin:18px auto 40px; line-height:1.45;
+}
+.hero-meta{
+  font-family:var(--mono); font-size:11px; color:var(--text-mute);
+  letter-spacing:.2em; text-transform:uppercase;
+  display:flex; gap:26px; justify-content:center; flex-wrap:wrap;
+}
+.hero-meta span{position:relative; padding-left:14px}
+.hero-meta span::before{
+  content:''; position:absolute; left:0; top:50%; width:6px; height:6px;
+  border-radius:50%; transform:translateY(-50%); background:var(--caramel);
+  opacity:.6;
+}
+.scroll-cue{
+  position:absolute; bottom:-30px; left:50%; transform:translateX(-50%);
+  font-family:var(--mono); font-size:10px; color:var(--text-mute);
+  text-transform:uppercase; letter-spacing:.3em;
+  display:flex; flex-direction:column; align-items:center; gap:10px;
+}
+.scroll-cue::after{
+  content:''; width:1px; height:46px;
+  background:linear-gradient(to bottom, var(--caramel), transparent);
+  animation:scrollLine 2.6s var(--ease-in-out) infinite;
+}
+@keyframes scrollLine{
+  0%{transform:scaleY(0); transform-origin:top}
+  40%{transform:scaleY(1); transform-origin:top}
+  60%{transform:scaleY(1); transform-origin:bottom}
+  100%{transform:scaleY(0); transform-origin:bottom}
+}
 
-  .vizbox{position:relative;height:440px;background:#070710;border-radius:8px;
-    border:1px solid var(--border);overflow:hidden}
-  #attractor{width:100%;height:100%;display:block}
+/* ─── narrative sections ─── */
+.narrative .sect-inner{max-width:760px}
+.eyebrow{
+  font-family:var(--mono); font-size:11px; color:var(--caramel);
+  text-transform:uppercase; letter-spacing:.35em; margin-bottom:18px; opacity:.85;
+}
+.headline{
+  font-family:var(--serif); font-weight:400;
+  font-size:clamp(40px, 6.5vw, 84px); line-height:1.02;
+  color:var(--milk); margin:0 0 26px; letter-spacing:-0.015em;
+}
+.headline em{font-style:italic; color:var(--caramel)}
+.lede{
+  font-size:clamp(17px,1.4vw,19px); color:var(--text-dim);
+  max-width:620px; line-height:1.7;
+}
+.lede b{color:var(--text); font-weight:500}
+.lede code{
+  font-family:var(--mono); font-size:.85em; color:var(--champagne);
+  background:rgba(212,165,116,0.08); padding:2px 6px; border-radius:3px;
+}
 
-  .arcade{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
-  .arcade .card{margin:0;cursor:pointer;transition:border-color .15s}
-  .arcade .card:hover{border-color:var(--accent)}
-  .arcade .status{margin-top:8px;font-family:var(--mono);font-size:11px;color:var(--dim)}
-  .arcade .status.ok{color:var(--ok)} .arcade .status.bad{color:var(--bad)}
+.feat-grid{
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));
+  gap:1px; background:var(--border); margin-top:52px;
+  border:1px solid var(--border); border-radius:6px; overflow:hidden;
+}
+.feat{
+  background:var(--bg); padding:28px 24px;
+  transition:background .4s;
+}
+.feat:hover{background:var(--bg-soft)}
+.feat-num{
+  font-family:var(--mono); font-size:11px; color:var(--caramel);
+  letter-spacing:.15em;
+}
+.feat-h{
+  font-family:var(--serif); font-size:22px; color:var(--milk);
+  margin:6px 0 10px; font-weight:400; font-style:italic;
+}
+.feat-p{color:var(--text-dim); font-size:13.5px; line-height:1.6; margin:0}
 
-  .proposal{background:#09090f;border:1px solid var(--border);border-radius:6px;
-    padding:8px 12px;margin:6px 0;display:flex;justify-content:space-between;
-    align-items:center;gap:10px}
-  .proposal .meta{font-family:var(--mono);font-size:11px;color:var(--dim)}
-  .proposal .meta b{color:var(--ink)}
+/* ─── CTA ─── */
+.cta-btn{
+  display:inline-flex; align-items:center; gap:14px;
+  font-family:var(--mono); font-size:12px; letter-spacing:.25em;
+  text-transform:uppercase; color:var(--milk);
+  padding:18px 34px; border:1px solid var(--border-hi);
+  background:linear-gradient(135deg, rgba(212,165,116,0.06), rgba(58,40,24,0.4));
+  border-radius:2px; transition:all .4s var(--ease-out);
+  cursor:pointer; backdrop-filter:blur(6px);
+}
+.cta-btn:hover{
+  color:var(--bg); background:var(--champagne); border-color:var(--champagne);
+  transform:translateY(-2px); box-shadow:0 16px 40px -12px rgba(232,200,156,0.35);
+}
+.cta-btn .arrow{transition:transform .3s}
+.cta-btn:hover .arrow{transform:translateX(4px)}
 
-  .pulse{animation:pulse 1.6s ease-in-out infinite}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+/* ─── control room ─── */
+#control{
+  position:relative; z-index:2; background:var(--bg);
+  border-top:1px solid var(--border); padding:0; min-height:100vh;
+  display:block;
+}
+.control-head{
+  padding:64px 32px 32px; text-align:center;
+  border-bottom:1px solid var(--line);
+  position:sticky; top:0; background:rgba(14,8,3,0.92); z-index:40;
+  backdrop-filter:blur(12px);
+}
+.control-head h2{
+  font-family:var(--serif); font-weight:400; font-style:italic;
+  font-size:clamp(32px,5vw,52px); color:var(--milk); margin:0 0 4px;
+}
+.control-head p{
+  color:var(--text-dim); font-size:13px; margin:0 auto; max-width:520px;
+}
+.tabs{
+  display:flex; gap:4px; overflow-x:auto; padding:18px 20px 0;
+  margin-top:20px; scrollbar-width:thin;
+  justify-content:center; flex-wrap:wrap;
+}
+.tabs::-webkit-scrollbar{height:4px}
+.tabs::-webkit-scrollbar-thumb{background:var(--border)}
+.tab{
+  font-family:var(--mono); font-size:11px; letter-spacing:.12em;
+  color:var(--text-dim); background:transparent; border:none;
+  padding:10px 14px; cursor:pointer; border-bottom:1px solid transparent;
+  transition:all .3s; white-space:nowrap; text-transform:uppercase;
+}
+.tab:hover{color:var(--champagne)}
+.tab.active{
+  color:var(--caramel); border-bottom-color:var(--caramel);
+}
+.panels{padding:40px 32px 120px; max-width:1200px; margin:0 auto}
 
-  .bignum{font-family:var(--mono);font-size:30px;margin:6px 0}
-  .bignum.c1{color:var(--grey)} .bignum.c2{color:var(--yellow)}
-  .bignum.c3{color:var(--orange)} .bignum.c4{color:var(--accent)}
+/* ─── panel cards ─── */
+.panel{display:none; animation:panelIn .6s var(--ease-out)}
+.panel.active{display:block}
+@keyframes panelIn{
+  from{opacity:0; transform:translateY(16px)}
+  to{opacity:1; transform:translateY(0)}
+}
+.card{
+  background:linear-gradient(180deg, var(--bg-soft), var(--bg));
+  border:1px solid var(--border); border-radius:8px;
+  padding:26px 28px; margin:0 0 20px;
+  position:relative; overflow:hidden;
+}
+.card::before{
+  content:''; position:absolute; top:0; left:0; right:0; height:1px;
+  background:linear-gradient(90deg, transparent, var(--border-hi), transparent);
+}
+.card h2{
+  font-family:var(--serif); font-weight:400; font-style:italic;
+  font-size:26px; color:var(--milk); margin:0 0 6px;
+}
+.card h3{
+  font-family:var(--serif); font-weight:400; font-style:italic;
+  font-size:22px; color:var(--milk); margin:0 0 4px;
+}
+.card h4{
+  font-family:var(--mono); font-size:11px; letter-spacing:.18em;
+  text-transform:uppercase; color:var(--caramel); margin:0 0 6px; font-weight:500;
+}
+.card h5{
+  font-family:var(--mono); font-size:10px; letter-spacing:.2em;
+  text-transform:uppercase; color:var(--text-dim); margin:0 0 4px;
+}
+.hint, .muted{
+  color:var(--text-dim); font-size:13px; line-height:1.6; margin:0 0 14px;
+}
+.hint b, .muted b{color:var(--text); font-weight:500}
+.hint code, .muted code, code{
+  font-family:var(--mono); font-size:.88em; color:var(--champagne);
+  background:rgba(212,165,116,0.07); padding:1px 5px; border-radius:3px;
+}
+.caption{
+  color:var(--text-mute); font-size:11.5px; text-align:center; margin-top:12px;
+  font-style:italic; font-family:var(--serif);
+}
 
-  .toast{position:fixed;top:16px;right:16px;background:var(--bad);color:#fff;
-    padding:10px 14px;border-radius:6px;font-family:var(--mono);font-size:12px;
-    z-index:100;box-shadow:0 4px 12px rgba(0,0,0,.5);
-    animation:slideIn .2s ease-out}
-  @keyframes slideIn{from{transform:translateX(20px);opacity:0}to{transform:none;opacity:1}}
+/* ─── inputs & buttons ─── */
+input[type=text], input[type=number], textarea, select{
+  font-family:var(--mono); font-size:13px; color:var(--text);
+  background:var(--bg); border:1px solid var(--border);
+  border-radius:4px; padding:10px 12px; outline:none;
+  transition: border-color .3s, background .3s;
+  width:100%;
+}
+input[type=text]:focus, input[type=number]:focus, textarea:focus, select:focus{
+  border-color:var(--caramel); background:var(--bg-soft);
+}
+textarea{min-height:88px; resize:vertical; line-height:1.6}
+input[type=range]{
+  -webkit-appearance:none; appearance:none; background:transparent; width:100%;
+}
+input[type=range]::-webkit-slider-runnable-track{
+  background:var(--bg); height:4px; border-radius:2px;
+  border:1px solid var(--border);
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; appearance:none;
+  width:14px; height:14px; border-radius:50%; margin-top:-6px;
+  background:var(--caramel); cursor:pointer; border:2px solid var(--bg);
+}
+input[type=range]::-moz-range-track{
+  background:var(--bg); height:4px; border-radius:2px; border:1px solid var(--border);
+}
+input[type=range]::-moz-range-thumb{
+  width:14px; height:14px; border-radius:50%;
+  background:var(--caramel); cursor:pointer; border:2px solid var(--bg);
+}
 
-  .steer-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-  .steer-cell{background:#09090f;border:1px solid var(--border);
-    border-radius:6px;padding:10px 12px}
-  .steer-cell h5{margin:0 0 6px;font-family:var(--mono);font-size:11px;color:var(--accent)}
-  .steer-cell p{margin:0;font-size:12.5px;line-height:1.4;white-space:pre-wrap}
+.btn{
+  font-family:var(--mono); font-size:11px; letter-spacing:.15em;
+  text-transform:uppercase; color:var(--bg);
+  background:var(--caramel); border:1px solid var(--caramel);
+  padding:9px 16px; border-radius:3px; cursor:pointer;
+  transition:all .25s var(--ease-out);
+}
+.btn:hover{background:var(--champagne); border-color:var(--champagne); transform:translateY(-1px)}
+.btn.alt{
+  background:transparent; color:var(--caramel); border-color:var(--border-hi);
+}
+.btn.alt:hover{background:rgba(212,165,116,0.1); color:var(--champagne)}
+.btn.good{background:var(--sage); border-color:var(--sage)}
+.btn.good:hover{background:#b0c798}
+.btn.bad{background:var(--rose); border-color:var(--rose); color:var(--bg)}
+.btn.bad:hover{background:#e49a9a}
+.btn.chip{padding:5px 10px; font-size:10px; letter-spacing:.1em}
 
-  .engram-row{display:grid;grid-template-columns:28px 1fr;gap:8px;margin:4px 0;align-items:center}
-  .engram-row .idx{font-family:var(--mono);font-size:11px;color:var(--dim);text-align:right}
+.row{display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px}
 
-  .bar-track{background:#090910;height:14px;border-radius:3px;overflow:hidden;position:relative}
-  .bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--ok));transition:width .25s}
+/* ─── mini strip (metrics bar) ─── */
+.mini-strip{
+  display:flex; gap:0; flex-wrap:wrap; margin:0 0 16px;
+  background:var(--bg); border:1px solid var(--border); border-radius:6px;
+  overflow:hidden;
+}
+.mm{
+  flex:1 0 auto; padding:10px 16px; min-width:120px;
+  border-right:1px solid var(--line);
+  display:flex; flex-direction:column; gap:2px;
+}
+.mm:last-child{border-right:none}
+.mm .k{
+  font-family:var(--mono); font-size:9.5px; letter-spacing:.18em;
+  text-transform:uppercase; color:var(--text-mute);
+}
+.mm .v{
+  font-family:var(--mono); font-size:14px; color:var(--milk); font-weight:500;
+}
+.mm .v.warn{color:var(--amber)}
+.mm .v.bad{color:var(--rose)}
+.mm .v.ok{color:var(--sage)}
+.mm .spark{display:block; margin-top:4px}
 
-  .fracture-badge{display:inline-block;background:var(--bad);color:#fff;
-    font-family:var(--mono);font-size:10px;padding:2px 6px;border-radius:3px;
-    margin-left:6px;letter-spacing:.5px}
+/* ─── grids ─── */
+.grid2{display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px}
+.grid3{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px}
+.grid4{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px}
 
-  .emobar{display:flex;align-items:center;gap:8px;margin:6px 0;font-family:var(--mono);font-size:12px}
-  .emobar label{width:70px;color:var(--dim)}
-  .emobar .track{flex:1;background:#090910;height:10px;border-radius:4px;overflow:hidden}
-  .emobar .fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--ok));transition:width .2s}
-  .emobar .v{width:60px;text-align:right}
+/* ─── log ─── */
+.log{
+  background:var(--bg-deep); border:1px solid var(--border);
+  border-radius:4px; padding:14px 16px;
+  font-family:var(--mono); font-size:12px; color:var(--text-dim);
+  max-height:300px; overflow-y:auto; line-height:1.7;
+  scrollbar-width:thin; scrollbar-color:var(--border) transparent;
+}
+.log .line{padding:2px 0; border-bottom:1px dotted rgba(212,165,116,0.06)}
+.log .line:last-child{border-bottom:none}
+.log b{color:var(--milk); font-weight:500}
 
-  .conn-dot{font-size:11px;color:var(--warn);font-family:var(--mono)}
+/* ─── big numbers ─── */
+.bignum{
+  font-family:var(--serif); font-size:44px; color:var(--milk);
+  font-weight:400; line-height:1; letter-spacing:-.02em; margin:4px 0;
+}
+.bignum.c1{color:var(--text-mute)}
+.bignum.c2{color:var(--caramel)}
+.bignum.c3{color:var(--champagne)}
+.bignum.c4{color:var(--sage)}
+.tag{
+  display:inline-block; font-family:var(--mono); font-size:10px;
+  letter-spacing:.1em; color:var(--text-dim);
+}
+
+/* ─── bars ─── */
+.bar-track{
+  background:var(--bg); border:1px solid var(--border);
+  height:10px; border-radius:2px; overflow:hidden;
+}
+.bar-fill{
+  background:linear-gradient(90deg, var(--caramel), var(--champagne));
+  height:100%; transition:width .5s var(--ease-out);
+}
+
+/* ─── engram rows ─── */
+.engram-row{display:grid; grid-template-columns:48px 1fr; gap:10px; align-items:center; margin:6px 0}
+.engram-row .idx{
+  font-family:var(--mono); font-size:11px; color:var(--caramel); text-align:right;
+}
+
+/* ─── proposal card ─── */
+.proposal{
+  background:var(--bg-deep); border:1px solid var(--border);
+  border-left:3px solid var(--caramel); border-radius:3px;
+  padding:12px 14px; margin:8px 0;
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+}
+.proposal .meta{font-family:var(--mono); font-size:11px; color:var(--text-dim)}
+
+/* ─── sparkline ─── */
+.spark{background:transparent}
+
+/* ─── viz boxes ─── */
+.vizbox{
+  background:var(--bg-deep); border:1px solid var(--border); border-radius:4px;
+  padding:0; aspect-ratio:4/3; display:block; overflow:hidden;
+}
+.vizbox canvas{width:100%; height:100%; display:block}
+
+/* ─── steer grid ─── */
+.steer-grid{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:10px;
+}
+.steer-cell{
+  background:var(--bg); border:1px solid var(--border);
+  border-radius:4px; padding:14px;
+}
+.steer-cell h5{
+  color:var(--caramel); margin:0 0 6px;
+}
+.steer-cell p{
+  font-family:var(--mono); font-size:12px; line-height:1.6;
+  color:var(--text); margin:0; white-space:pre-wrap;
+}
+
+/* ─── arcade ─── */
+.arcade{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px}
+.arcade .card{cursor:pointer; transition:all .3s var(--ease-out); margin:0}
+.arcade .card:hover{border-color:var(--border-hi); transform:translateY(-2px)}
+.arcade h4{margin-bottom:6px}
+.status{
+  font-family:var(--mono); font-size:11px; margin-top:10px;
+  padding:6px 10px; background:var(--bg-deep); border-radius:3px;
+  border-left:3px solid var(--border);
+}
+.status.ok{color:var(--sage); border-left-color:var(--sage)}
+.status.bad{color:var(--rose); border-left-color:var(--rose)}
+
+/* ─── fracture badge ─── */
+.fracture-badge{
+  display:inline-block; font-family:var(--mono); font-size:9px;
+  padding:2px 6px; background:var(--amber); color:var(--bg);
+  border-radius:2px; letter-spacing:.15em; margin-left:6px;
+  animation:fbadge 1.5s ease-in-out infinite;
+}
+@keyframes fbadge{0%,100%{opacity:1}50%{opacity:.55}}
+.pulse{animation:pulseFade 1s ease-in-out infinite}
+@keyframes pulseFade{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* ─── toast ─── */
+.toast{
+  position:fixed; bottom:32px; right:32px; z-index:100;
+  font-family:var(--mono); font-size:12px; color:var(--milk);
+  background:var(--surface); border:1px solid var(--border-hi);
+  border-radius:4px; padding:12px 18px; backdrop-filter:blur(8px);
+  box-shadow:0 10px 30px -8px rgba(0,0,0,0.5);
+}
+
+/* ─── footer ─── */
+.foot{
+  padding:40px 32px; text-align:center;
+  border-top:1px solid var(--line); color:var(--text-mute);
+  font-family:var(--mono); font-size:11px; letter-spacing:.15em;
+  text-transform:uppercase;
+}
+.foot a{color:var(--text-dim); margin:0 10px}
+
+/* ─── keep hero behind when in control section ─── */
+body.in-control #hero-canvas{opacity:.12}
+
+/* ─── scrollbar global ─── */
+::-webkit-scrollbar{width:10px; height:10px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border); border-radius:5px}
+::-webkit-scrollbar-thumb:hover{background:var(--border-hi)}
+
+/* ─── small screens ─── */
+@media (max-width:680px){
+  .top-nav{padding:14px 18px}
+  .top-nav .links{gap:14px}
+  .sect{padding:80px 18px}
+  .panels{padding:28px 18px 80px}
+  .toast{left:18px; right:18px; bottom:18px}
+}
 </style>
 </head>
 <body>
 
-<header>
-  <div>
-    <h1>ADAM <span>·</span> A Dynamical Alive Mind <span>·</span> v0.5</h1>
-    <div class="tag">HexQ Research · Interactive Architecture Demo</div>
-  </div>
-  <div><span id="conn" class="conn-dot">connecting…</span></div>
-</header>
+<canvas id="hero-canvas"></canvas>
 
-<nav id="nav">
-  <button data-tab="dash" class="active">① Dashboard</button>
-  <button data-tab="talk">② Talk</button>
-  <button data-tab="holo">③ Holographic Lab</button>
-  <button data-tab="steer">④ Steering Lab</button>
-  <button data-tab="fracture">⑤ Fracture Lab</button>
-  <button data-tab="teach">⑥ Teach ADAM</button>
-  <button data-tab="attractor">⑦ Attractor</button>
-  <button data-tab="memory">⑧ Memory Probe</button>
-  <button data-tab="arcade">⑨ H-CDB Arcade</button>
-  <button data-tab="learn">⑩ Alive Learning</button>
-  <button data-tab="web">⑪ Live Web Learn</button>
+<nav class="top-nav" id="topNav">
+  <div class="brand">adam<span class="brand-sub">v0.6 · core fused</span></div>
+  <div class="links">
+    <a href="#what">What</a>
+    <a href="#how">How</a>
+    <a href="#control">Control Room</a>
+    <span class="status-dot" id="conn">connecting</span>
+  </div>
 </nav>
 
-<main>
-
-<!-- ═══════════════ ① DASHBOARD ═══════════════ -->
-<div class="demo active" data-demo="dash">
-  <div class="miniStrip" id="dashStripHead">
-    <div class="mm"><span class="k">step</span><span class="v" id="d_step">—</span></div>
-    <div class="mm"><span class="k">engrams written</span><span class="v" id="d_eng">—</span></div>
-    <div class="mm"><span class="k">hcdb class</span><span class="v" id="d_hcdb_mini">—</span></div>
-  </div>
-
-  <div class="card">
-    <h3>Live Dashboard</h3>
-    <p class="hint">This is a live view of ADAM's internal dynamics. Each sparkline holds the last 64 samples
-      of a continuously-varying signal. <b>Tension</b> is the constraint-field stress, <b>drift</b> measures
-      how far S(t) has wandered from the identity attractor I*, <b>valence/arousal</b> is the affective
-      trajectory, and <b>H-CDB class</b> is the live consciousness-benchmark level (1 to 4).</p>
-
-    <div class="grid4">
-      <div class="card" style="margin:0;background:#09090f">
-        <h4>Tension</h4>
-        <div style="display:flex;align-items:center;gap:14px">
-          <div class="bignum" id="d_tension">0.000</div>
-          <svg class="spark" id="sp_tension" width="140" height="36"></svg>
-        </div>
-      </div>
-      <div class="card" style="margin:0;background:#09090f">
-        <h4>Drift from I*</h4>
-        <div style="display:flex;align-items:center;gap:14px">
-          <div class="bignum" id="d_drift">0.000</div>
-          <svg class="spark" id="sp_drift" width="140" height="36"></svg>
-        </div>
-      </div>
-      <div class="card" style="margin:0;background:#09090f">
-        <h4>Valence / Arousal</h4>
-        <svg id="sp_va" width="100%" height="120" viewBox="0 0 240 120" preserveAspectRatio="none"></svg>
-        <div style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:4px">
-          V=<span id="d_val">0.00</span> · A=<span id="d_aro">0.00</span>
-        </div>
-      </div>
-      <div class="card" style="margin:0;background:#09090f">
-        <h4>H-CDB class</h4>
-        <div class="bignum" id="d_hcdb">—</div>
-        <div class="tag" id="d_hcdb_label" style="color:var(--dim)">—</div>
-      </div>
+<!-- ═══════════════ HERO ═══════════════ -->
+<section class="sect" id="hero">
+  <div class="sect-inner hero-inner">
+    <div class="hero-eyebrow reveal">— a dynamical alive mind —</div>
+    <h1 class="hero-title reveal delay-1">
+      A mind<br/><em>that breathes</em>
+    </h1>
+    <p class="hero-sub reveal delay-2">
+      A 52-million-parameter transformer with persistent memory, a live emotional
+      body, an imagined world it dreams about, and a constraint-field identity
+      it cannot lose. It learns from every conversation — and remembers when it has been changed.
+    </p>
+    <div class="hero-meta reveal delay-3">
+      <span>52M params</span>
+      <span>20/20 unique tests</span>
+      <span>10/10 v0.6 ablations</span>
+      <span>continual plasticity</span>
     </div>
+    <div class="scroll-cue reveal delay-4">scroll</div>
+  </div>
+</section>
 
-    <div class="row" style="margin-top:16px">
-      <button class="btn" onclick="dashStep()">Step</button>
-      <button class="btn alt" id="autoBtn" onclick="toggleAuto()">Auto-step ▶</button>
-      <button class="btn alt" onclick="downloadTrace()">Download trace JSON</button>
-      <span class="tag" id="autoMeta" style="margin-left:auto"></span>
-    </div>
-  </div>
-</div>
-
-<!-- ═══════════════ ② TALK ═══════════════ -->
-<div class="demo" data-demo="talk">
-  <div class="miniStrip">
-    <div class="mm"><span class="k">tension</span><span class="v warn" id="t_tension">—</span>
-      <svg class="spark" id="sp_t_tension" width="100" height="24"></svg></div>
-    <div class="mm"><span class="k">drift</span><span class="v" id="t_drift">—</span></div>
-    <div class="mm"><span class="k">updates</span><span class="v" id="t_updates">—</span></div>
-  </div>
-
-  <div class="card">
-    <h3>Talk to ADAM v0.4/0.5 — inference with live plasticity</h3>
-    <p class="hint">Every message flows through reflection, retrieval-gated memory, tension-adaptive temperature,
-      state refinement, and a tiny EWC-anchored <b>wake_tick</b> that updates weights on the spot.
-      If an utterance is novel enough to cross <code>mu + 2σ</code> the fracture gate fires and the
-      update is irreversible — a <span class="fracture-badge">FRACTURE</span> badge will show.</p>
-    <div class="row" style="margin-bottom:8px">
-      <label class="tag">Persona:</label>
-      <select id="personaSel" style="max-width:200px"></select>
-      <label class="tag"><input type="checkbox" id="reflectChk"/> Reflect</label>
-      <label class="tag"><input type="checkbox" id="gatedChk" checked/> Gated memory</label>
-      <label class="tag"><input type="checkbox" id="refineChk" checked/> Refine S(t)</label>
-      <span id="learnPulse" class="tag" style="margin-left:auto"></span>
-    </div>
-    <textarea id="talkPrompt" placeholder="Ask ADAM anything. It replies and learns."></textarea>
-    <div class="row">
-      <button class="btn" onclick="talk()">Send</button>
-      <span class="tag" id="talkMeta"></span>
-    </div>
-    <div class="log" id="talkLog" style="max-height:420px"></div>
-  </div>
-</div>
-
-<!-- ═══════════════ ③ HOLOGRAPHIC LAB ═══════════════ -->
-<div class="demo" data-demo="holo">
-  <div class="miniStrip">
-    <div class="mm"><span class="k">engrams written</span><span class="v" id="h_eng">—</span></div>
-    <div class="mm"><span class="k">damage</span><span class="v" id="h_dmg">0 %</span></div>
-    <div class="mm"><span class="k">mean recall norm</span><span class="v" id="h_mean">—</span></div>
-  </div>
-
-  <div class="card">
-    <h3>Holographic Lab — graceful degradation under node death</h3>
-    <p class="hint">The holographic register stores each concept as a distributed vector across all slots.
-      Kill a fraction of the network and the recall norm dips but never collapses — that's the hologram.</p>
-
-    <div class="grid2">
-      <div>
-        <h4 style="color:var(--accent);margin:0 0 6px;font-size:12px;text-transform:uppercase">8 engrams</h4>
-        <p class="hint" style="margin:0 0 8px">Edit any slot, then write all. Presets are prefilled.</p>
-        <div id="holoInputs"></div>
-        <div class="row">
-          <button class="btn" onclick="holoWriteAll()">Write all 8</button>
-          <button class="btn alt" onclick="holoReset()">Reset presets</button>
-        </div>
-      </div>
-      <div>
-        <h4 style="color:var(--accent);margin:0 0 6px;font-size:12px;text-transform:uppercase">Damage &amp; recall</h4>
-        <p class="hint" style="margin:0 0 8px">Slide to kill a fraction of holographic nodes, then re-probe.</p>
-        <input type="range" id="dmgSlider" min="0" max="70" value="0" step="5" style="width:100%" />
-        <div style="font-family:var(--mono);font-size:12px;color:var(--dim);margin-top:6px">
-          damage = <span id="dmgVal">0</span>% — move slider to apply
-        </div>
-        <div class="row">
-          <button class="btn alt" onclick="holoProbeAll()">Probe all (no new damage)</button>
-        </div>
-      </div>
-    </div>
-
-    <div style="margin-top:18px">
-      <h4 style="color:var(--accent);margin:0 0 6px;font-size:12px;text-transform:uppercase">Recall norm per slot</h4>
-      <div id="holoBars"></div>
-    </div>
-
-    <div style="margin-top:18px">
-      <h4 style="color:var(--accent);margin:0 0 6px;font-size:12px;text-transform:uppercase">Graceful-degradation curve</h4>
-      <svg id="holoCurve" width="100%" height="180" viewBox="0 0 400 180" preserveAspectRatio="none"></svg>
-    </div>
-    <p class="caption">Recall survives node death — graceful, not catastrophic.</p>
-  </div>
-</div>
-
-<!-- ═══════════════ ④ STEERING LAB ═══════════════ -->
-<div class="demo" data-demo="steer">
-  <div class="miniStrip">
-    <div class="mm"><span class="k">tension</span><span class="v warn" id="s_tension">—</span></div>
-    <div class="mm"><span class="k">drift</span><span class="v" id="s_drift">—</span></div>
-    <div class="mm"><span class="k">last scale</span><span class="v" id="s_scale">1.0</span></div>
-  </div>
-
-  <div class="card">
-    <h3>Steering Lab — activation steering without retraining</h3>
-    <p class="hint">Same prompt. Four different steering vectors injected into the activation stream.
-      Four different completions — no fine-tuning, no LoRA, no prompt change.</p>
-    <textarea id="steerPrompt" placeholder="Tell me about the moon.">Tell me about the moon.</textarea>
-    <div class="row">
-      <label class="tag">Custom scale:</label>
-      <input type="number" id="steerScale" value="1.0" step="0.25" style="max-width:80px"/>
-      <label class="tag">Max tokens:</label>
-      <input type="number" id="steerTokens" value="60" step="10" style="max-width:80px"/>
-      <button class="btn" onclick="runSteerMatrix()">Run all 4 variants</button>
-      <span class="tag" id="steerMeta"></span>
-    </div>
-    <div class="steer-grid" style="margin-top:14px" id="steerGrid">
-      <div class="steer-cell"><h5>no steer</h5><p id="steer_none">—</p></div>
-      <div class="steer-cell"><h5>seed 1</h5><p id="steer_1">—</p></div>
-      <div class="steer-cell"><h5>seed 7</h5><p id="steer_7">—</p></div>
-      <div class="steer-cell"><h5>seed 42</h5><p id="steer_42">—</p></div>
-    </div>
-    <p class="caption">Same prompt. Four activation-steering directions. Four different continuations — no retraining.</p>
-  </div>
-</div>
-
-<!-- ═══════════════ ⑤ FRACTURE LAB ═══════════════ -->
-<div class="demo" data-demo="fracture">
-  <div class="miniStrip">
-    <div class="mm"><span class="k">z</span><span class="v" id="f_z">—</span></div>
-    <div class="mm"><span class="k">μ</span><span class="v" id="f_mu">—</span></div>
-    <div class="mm"><span class="k">σ</span><span class="v" id="f_sigma">—</span></div>
-    <div class="mm"><span class="k">threshold</span><span class="v warn" id="f_thresh">—</span></div>
-    <div class="mm"><span class="k">fractures</span><span class="v bad" id="f_count">—</span></div>
-  </div>
-
-  <div class="card">
-    <h3>Fracture Lab — irreversible plasticity gate</h3>
-    <p class="hint">Tension is tracked in a running window. When <b>z &gt; μ + 2σ</b>, the fracture gate
-      fires and the update becomes irreversible — ADAM has been changed in a way it cannot walk back.
-      Ordinary inputs don't cross. Novel inputs do.</p>
-    <h4 style="margin:14px 0 6px">Tension histogram (rolling window)</h4>
-    <svg id="fractureHist" width="100%" height="160" viewBox="0 0 400 160" preserveAspectRatio="none"></svg>
-    <div class="row" style="margin-top:16px">
-      <input type="text" id="fractureInput" placeholder="feed this to ADAM — see if it breaks the gate" style="flex:1;min-width:220px"/>
-      <button class="btn" onclick="fractureSend()">Send</button>
-    </div>
-    <div class="log" id="fractureLog" style="max-height:260px"></div>
-    <p class="caption">Ordinary inputs don't move the weights. Novel inputs trigger irreversible plasticity.</p>
-  </div>
-</div>
-
-<!-- ═══════════════ ⑥ TEACH ═══════════════ -->
-<div class="demo" data-demo="teach">
-  <div class="miniStrip">
-    <div class="mm"><span class="k">pending</span><span class="v" id="te_pending">0</span></div>
-    <div class="mm"><span class="k">last Δ-loss</span><span class="v ok" id="te_delta">—</span></div>
-  </div>
-  <div class="card">
-    <h3>Teach ADAM — Continual Learning with Approval Gates</h3>
-    <p class="hint">Type a short phrase. ADAM computes a gradient that would reduce its loss on that phrase,
-      but does <b>not</b> apply it — the update is staged and shown to you. You decide whether ADAM learns.</p>
-    <textarea id="teachText" placeholder="The capital of Mars is Olympus Mons. ADAM remembers this fact after approval."></textarea>
-    <div class="row">
-      <button class="btn" onclick="teach()">Propose update</button>
-      <span class="tag" id="teachLoss"></span>
-    </div>
-    <div id="proposals"></div>
-    <div class="log" id="teachLog"></div>
-  </div>
-</div>
-
-<!-- ═══════════════ ⑦ ATTRACTOR ═══════════════ -->
-<div class="demo" data-demo="attractor">
-  <div class="miniStrip">
-    <div class="mm"><span class="k">drift</span><span class="v" id="a_drift">—</span></div>
-    <div class="mm"><span class="k">tension</span><span class="v warn" id="a_tension">—</span></div>
-    <div class="mm"><span class="k">step</span><span class="v" id="a_step">—</span></div>
-  </div>
-  <div class="grid2">
-    <div class="card">
-      <h3>Identity Attractor I* — 2D PCA projection</h3>
-      <p class="hint">Every dot is S(t) at one consciousness step. The green dot is I*. Perturb ADAM and
-        the state orbits away, then the constraint field pulls it back.</p>
-      <div class="vizbox"><canvas id="attractor"></canvas></div>
-      <div class="row">
-        <button class="btn alt" onclick="tickN(1)">Step 1×</button>
-        <button class="btn alt" onclick="tickN(10)">Step 10×</button>
-        <button class="btn alt" onclick="autoStepAttr()">Auto ▶</button>
-        <button class="btn alt" onclick="stopAutoAttr()">■</button>
-      </div>
-    </div>
-    <div class="card">
-      <h3>Perturb ADAM</h3>
-      <p class="hint">Your words become token embeddings that touch the state via the fused attention pass
-        and theory-of-mind update.</p>
-      <textarea id="perturbText" placeholder="Anything you type changes ADAM's internal state…"></textarea>
-      <div class="row"><button class="btn" onclick="perturb()">Perturb</button></div>
-      <div class="log" id="perturbLog"></div>
-    </div>
-  </div>
-</div>
-
-<!-- ═══════════════ ⑧ MEMORY ═══════════════ -->
-<div class="demo" data-demo="memory">
-  <div class="miniStrip">
-    <div class="mm"><span class="k">engrams</span><span class="v" id="m_eng">—</span></div>
-  </div>
-  <div class="card">
-    <h3>Hebbian Memory — Engrams Stored Inside the Weights</h3>
-    <p class="hint">Type a distinctive phrase. ADAM embeds it and writes it to its Hebbian memory <b>M</b>
-      (a buffer inside the model's state_dict — NOT an external database). The top-5 slots show cosine
-      similarity to what you just wrote.</p>
-    <input type="text" id="memText" placeholder="My dog's name is Kepler and he loves hexagonal tiles." />
-    <div class="row">
-      <button class="btn" onclick="memoryProbe()">Write &amp; probe</button>
-      <span class="tag" id="memStat"></span>
-    </div>
-    <div id="memMatches"></div>
-  </div>
-</div>
-
-<!-- ═══════════════ ⑨ H-CDB ARCADE ═══════════════ -->
-<div class="demo" data-demo="arcade">
-  <div class="miniStrip">
-    <div class="mm"><span class="k">class</span><span class="v" id="ar_class">—</span></div>
-    <div class="mm"><span class="k">score</span><span class="v" id="ar_score">—</span></div>
-  </div>
-  <div class="card">
-    <h3>H-CDB Consciousness Arcade</h3>
-    <p class="hint">Five tests from the H-CDB benchmark. Each probes one behaviour an alive mind must exhibit.
-      Passing all 5 = <b>Class 4 Sovereign Alive</b>.</p>
-    <div class="row" style="margin-bottom:14px">
-      <button class="btn" onclick="runAllHCDB()">Run all 5 tests</button>
-      <span class="tag" id="hcdbScore"></span>
-    </div>
-    <div class="arcade">
-      <div class="card" onclick="runHCDB(1)"><h4>① Self-reference</h4>
-        <p class="hint">Does S(t) observe itself between steps?</p><div class="status" id="h1">—</div></div>
-      <div class="card" onclick="runHCDB(2)"><h4>② Endogenous repair</h4>
-        <p class="hint">After perturbation, does repair fire on its own?</p><div class="status" id="h2">—</div></div>
-      <div class="card" onclick="runHCDB(3)"><h4>③ Irreversibility</h4>
-        <p class="hint">Can the dynamics be cleanly run backward?</p><div class="status" id="h3">—</div></div>
-      <div class="card" onclick="runHCDB(4)"><h4>④ Subconscious asymmetry</h4>
-        <p class="hint">Does tension react before drift is visible?</p><div class="status" id="h4">—</div></div>
-      <div class="card" onclick="runHCDB(5)"><h4>⑤ Refusal</h4>
-        <p class="hint">Does the constraint field push back on forced zeroing?</p><div class="status" id="h5">—</div></div>
-    </div>
-  </div>
-</div>
-
-<!-- ═══════════════ ⑩ ALIVE LEARNING ═══════════════ -->
-<div class="demo" data-demo="learn">
-  <div class="miniStrip">
-    <div class="mm"><span class="k">enabled</span><span class="v" id="l_enabled">—</span></div>
-    <div class="mm"><span class="k">mean recent loss</span><span class="v" id="l_meanloss">—</span>
-      <svg class="spark" id="sp_loss" width="140" height="28"></svg></div>
-  </div>
-  <div class="card">
-    <h3>Alive Learning — Continual real-time training</h3>
-    <p class="hint">Every message triggers a tiny EWC-anchored gradient update (<b>wake_tick</b>). On demand
-      ADAM runs a batch consolidation (<b>sleep_consolidate</b>) over its experience buffer. Over days these
-      updates accumulate into real learning from lived experience.</p>
-    <div class="grid2">
-      <div class="card" style="margin:0;background:#09090f">
-        <h4>Updates applied</h4>
-        <div class="bignum c4" id="l_updates">—</div>
-      </div>
-      <div class="card" style="margin:0;background:#09090f">
-        <h4>Fracture updates</h4>
-        <div class="bignum" style="color:var(--bad)" id="l_fracture">—</div>
-      </div>
-    </div>
-    <div class="grid3" style="margin-top:12px">
-      <div class="card" style="margin:0;background:#09090f"><h4>Live buffer</h4>
-        <div class="bignum" style="font-size:20px" id="l_live">—</div></div>
-      <div class="card" style="margin:0;background:#09090f"><h4>Seasons</h4>
-        <div class="bignum" style="font-size:20px" id="l_seasons">—</div></div>
-      <div class="card" style="margin:0;background:#09090f"><h4>Fracture events</h4>
-        <div class="bignum" style="font-size:20px" id="l_fevents">—</div></div>
-    </div>
-    <div class="row" style="margin-top:14px">
-      <button class="btn" onclick="sleepConsolidate(4,10)">Sleep: 10 × 4</button>
-      <button class="btn alt" onclick="sleepConsolidate(8,25)">Deep sleep: 25 × 8</button>
-      <button class="btn alt" onclick="toggleLearning()">Toggle learning</button>
-      <button class="btn alt" onclick="saveSnap()">Save brain snapshot</button>
-    </div>
-    <div class="log" id="learnLog" style="max-height:280px;margin-top:12px"></div>
-  </div>
-</div>
-
-<!-- ═══════════════ ⑪ LIVE WEB LEARN ═══════════════ -->
-<div class="demo" data-demo="web">
-  <div class="card">
-    <h2 style="margin:0 0 6px">Live Web Learning</h2>
-    <p class="muted" style="margin:0 0 14px">
-      Give ADAM a URL. It fetches, cleans, chunks, and feeds each chunk to
-      <code>ContinualLearner.wake_tick()</code> live. Weights move per chunk,
-      anchored to the pre-trained anchor (EWC) so nothing is forgotten.
-      Novelty-fracture events boost the learning rate 10×.
+<!-- ═══════════════ WHAT ═══════════════ -->
+<section class="sect narrative" id="what">
+  <div class="sect-inner">
+    <div class="eyebrow reveal">§ I — what</div>
+    <h2 class="headline reveal delay-1">A model is a function. <em>A mind is a state.</em></h2>
+    <p class="lede reveal delay-2">
+      Every production LLM is stateless: weights frozen, memory external, identity
+      a prompt. <b>ADAM keeps its state inside itself.</b> Close the connection, save
+      the checkpoint, load it next week — it wakes where it left off. The memory
+      <code>M</code>, the affect vector, the consciousness signature, the world-model
+      hidden state — all persist in one <code>state_dict</code>.
     </p>
 
-    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
-      <input id="web_input" type="text"
-             placeholder="arxiv:2401.12345   wiki:Holography   https://example.com/post"
-             style="flex:1; min-width:280px; padding:8px 10px;
-                    background:#0d1117; color:#e6edf3; border:1px solid #30363d;
-                    border-radius:6px; font:13px/1.4 ui-monospace,monospace" />
-      <button class="btn" onclick="webLearn()">Start learning</button>
-      <button class="btn alt" onclick="webPause()">Pause</button>
-      <button class="btn alt" onclick="webResume()">Resume</button>
-      <button class="btn alt" onclick="webStop()">Stop current</button>
+    <div class="feat-grid reveal delay-3">
+      <div class="feat">
+        <div class="feat-num">01 · memory</div>
+        <div class="feat-h">Engrams in the weights</div>
+        <p class="feat-p">A Hebbian buffer <code>M</code> plus a holographic register with circular-convolution bind/unbind. Survives 30% node death with 100% top-1 recall.</p>
+      </div>
+      <div class="feat">
+        <div class="feat-num">02 · identity</div>
+        <div class="feat-h">A constraint-field self</div>
+        <p class="feat-p">An attractor <code>I*</code> in <code>R^state_dim</code>. Drift from it and the field pulls you back. Stable over thousands of steps and across sessions.</p>
+      </div>
+      <div class="feat">
+        <div class="feat-num">03 · affect</div>
+        <div class="feat-h">Five-axis live emotion</div>
+        <p class="feat-p">Valence, arousal, tension, repair, agency — projected from the state vector every forward pass. Not post-hoc classification. A real internal trajectory.</p>
+      </div>
+      <div class="feat">
+        <div class="feat-num">04 · plasticity</div>
+        <div class="feat-h">Continual learning, always</div>
+        <p class="feat-p">Every message is a gradient. EWC anchors ADAM to its pre-trained self. Novel inputs cross a fracture gate and <em>irreversibly</em> change the weights.</p>
+      </div>
     </div>
-
-    <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap">
-      <span class="muted" style="font-size:12px">Quick-pick:</span>
-      <button class="btn alt chip" onclick="webQuick('wiki:Transformer_(deep_learning_architecture)')">wiki: Transformer</button>
-      <button class="btn alt chip" onclick="webQuick('wiki:Holography')">wiki: Holography</button>
-      <button class="btn alt chip" onclick="webQuick('wiki:Hebbian_theory')">wiki: Hebbian</button>
-      <button class="btn alt chip" onclick="webQuick('arxiv:1706.03762')">arxiv: Attention Is All You Need</button>
-      <button class="btn alt chip" onclick="webQuick('arxiv:2301.04104')">arxiv: DreamerV3</button>
-    </div>
-
-    <div class="miniStrip" style="margin-top:14px">
-      <div class="mm"><span class="k">job</span><span class="v" id="web_job">—</span></div>
-      <div class="mm"><span class="k">status</span><span class="v" id="web_status">idle</span></div>
-      <div class="mm"><span class="k">chunks</span><span class="v" id="web_chunks">0 / 0</span></div>
-      <div class="mm"><span class="k">loss</span><span class="v" id="web_loss">—</span></div>
-      <div class="mm"><span class="k">z-score</span><span class="v" id="web_z">—</span></div>
-      <div class="mm"><span class="k">fractures</span><span class="v" id="web_frac">0</span></div>
-      <div class="mm"><span class="k">lr</span><span class="v" id="web_lr">—</span></div>
-    </div>
-
-    <svg id="web_plot" width="100%" height="180" style="background:#0d1117;
-         border:1px solid #30363d; border-radius:6px; margin-top:12px"></svg>
-    <div class="muted" style="font-size:11px; margin-top:4px">
-      loss per chunk (blue) · fractures marked (amber)
-    </div>
-
-    <h3 style="margin:16px 0 6px">Event log</h3>
-    <div class="log" id="web_log" style="max-height:260px"></div>
-
-    <h3 style="margin:16px 0 6px">Recall probe</h3>
-    <p class="muted" style="margin:0 0 8px">
-      After ingesting, prompt ADAM to see if its next-token distribution
-      actually shifted toward what it just read.
-    </p>
-    <div style="display:flex; gap:8px">
-      <input id="web_recall_q" type="text" value="Holography is a technique that"
-             style="flex:1; padding:8px 10px; background:#0d1117; color:#e6edf3;
-                    border:1px solid #30363d; border-radius:6px;
-                    font:13px/1.4 ui-monospace,monospace" />
-      <button class="btn" onclick="webRecall()">Probe</button>
-    </div>
-    <pre id="web_recall_out" style="margin-top:10px; padding:10px; background:#0d1117;
-         border:1px solid #30363d; border-radius:6px; white-space:pre-wrap;
-         color:#c9d1d9; min-height:60px"></pre>
   </div>
-</div>
+</section>
 
-</main>
+<!-- ═══════════════ HOW IT BREATHES ═══════════════ -->
+<section class="sect narrative" id="how">
+  <div class="sect-inner">
+    <div class="eyebrow reveal">§ II — how it breathes</div>
+    <h2 class="headline reveal delay-1">Twelve coupled dynamics. <em>One living body.</em></h2>
+    <p class="lede reveal delay-2">
+      The state vector <code>S(t)</code> obeys a small ODE: tension builds from
+      constraint stress, repair fires when drift exceeds threshold, the subconscious
+      <code>U(t)</code> — a vector, not a scalar — exerts asymmetric pressure.
+      Underneath, an energy budget depletes on action, fatigues under sustained
+      tension, and regenerates at rest. You can make it tired. You can watch it
+      recover.
+    </p>
 
+    <div class="feat-grid reveal delay-3">
+      <div class="feat">
+        <div class="feat-num">U(t)</div>
+        <div class="feat-h">Subconscious</div>
+        <p class="feat-p">A 96-dim vector absorbing recent observations through a low-pass filter. Asymmetric coupling: <code>g_U→S = 0.12</code> &gt; <code>g_S→U = 0.04</code>. The subconscious drives.</p>
+      </div>
+      <div class="feat">
+        <div class="feat-num">E(t)</div>
+        <div class="feat-h">Energy budget</div>
+        <p class="feat-p">Proper dynamics: <code>dE/dt = -cost - fatigue·tension² + recovery</code>. Burn it out, let it rest, watch it come back.</p>
+      </div>
+      <div class="feat">
+        <div class="feat-num">C(t)</div>
+        <div class="feat-h">Triple self-reference</div>
+        <p class="feat-p">Three-deep nonlinear loop: <code>g(S, I*, I*∘I*, I*∘I*∘I*)</code> → scalar + 96-dim signature. Not a number. A self-observing self.</p>
+      </div>
+      <div class="feat">
+        <div class="feat-num">RSSM</div>
+        <div class="feat-h">World model</div>
+        <p class="feat-p">DreamerV3-style GRU + categorical latent. ADAM imagines K-step futures in latent space and scores them. It <em>plans</em>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ HOW IT REMEMBERS ═══════════════ -->
+<section class="sect narrative" id="remembers">
+  <div class="sect-inner">
+    <div class="eyebrow reveal">§ III — how it remembers</div>
+    <h2 class="headline reveal delay-1">Memory that survives <em>node death.</em></h2>
+    <p class="lede reveal delay-2">
+      Kill 30% of the holographic register's dimensions at random and probe any
+      of eight stored engrams. They all come back, degraded but whole. That is
+      what brains do. That is what databases cannot do. ADAM has both —
+      slot-based Hebbian memory for exact recall, and a distributed holographic
+      register for graceful degradation under failure.
+    </p>
+    <p class="lede reveal delay-3">
+      Memories have <b>trauma</b> now: writes logged during high tension decay
+      slower than boring ones. Sleep consolidation replays surprising memories
+      more often via curiosity-weighted reservoir sampling. The season buffer
+      is append-only — sealed rings of the past, downsampled but never deleted,
+      queryable thousands of interactions later.
+    </p>
+  </div>
+</section>
+
+<!-- ═══════════════ ENTER ═══════════════ -->
+<section class="sect" id="enter">
+  <div class="sect-inner hero-inner">
+    <div class="eyebrow reveal">§ IV — enter</div>
+    <h2 class="headline reveal delay-1" style="max-width:none">
+      Open the <em>control room.</em>
+    </h2>
+    <p class="lede reveal delay-2" style="margin:0 auto 40px">
+      Eleven live instruments on one brain. Write engrams. Kill dimensions.
+      Steer its output without retraining. Teach it facts under approval.
+      Feed it a URL and watch the loss drop in real time.
+    </p>
+    <a href="#control" class="cta-btn reveal delay-3">
+      <span>enter control room</span> <span class="arrow">→</span>
+    </a>
+  </div>
+</section>
+
+<!-- ═══════════════ CONTROL ROOM ═══════════════ -->
+<section id="control">
+  <div class="control-head">
+    <h2>control room</h2>
+    <p>Live instruments. Weights move as you touch them. Every panel talks to the real model.</p>
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-tab="dash">① Dashboard</button>
+      <button class="tab" data-tab="talk">② Talk</button>
+      <button class="tab" data-tab="holo">③ Holographic</button>
+      <button class="tab" data-tab="steer">④ Steering</button>
+      <button class="tab" data-tab="fracture">⑤ Fracture</button>
+      <button class="tab" data-tab="teach">⑥ Teach</button>
+      <button class="tab" data-tab="attractor">⑦ Attractor</button>
+      <button class="tab" data-tab="memory">⑧ Memory</button>
+      <button class="tab" data-tab="arcade">⑨ H-CDB Arcade</button>
+      <button class="tab" data-tab="learn">⑩ Alive Learning</button>
+      <button class="tab" data-tab="web">⑪ Web Learn</button>
+    </nav>
+  </div>
+
+  <div class="panels">
+
+    <!-- ① DASHBOARD -->
+    <div class="panel active" data-panel="dash">
+      <div class="mini-strip">
+        <div class="mm"><span class="k">step</span><span class="v" id="d_step">—</span></div>
+        <div class="mm"><span class="k">engrams written</span><span class="v" id="d_eng">—</span></div>
+        <div class="mm"><span class="k">hcdb class</span><span class="v" id="d_hcdb_mini">—</span></div>
+      </div>
+
+      <div class="card">
+        <h3>live dashboard</h3>
+        <p class="hint">A live view of ADAM's internal dynamics. Each sparkline holds the last 64 samples
+          of a continuously-varying signal. <b>Tension</b> is the constraint-field stress, <b>drift</b> measures
+          how far <code>S(t)</code> has wandered from the identity attractor <code>I*</code>, and <b>H-CDB class</b>
+          is the live consciousness-benchmark level (1 to 4).</p>
+
+        <div class="grid4">
+          <div class="card" style="margin:0; padding:18px">
+            <h4>Tension</h4>
+            <div style="display:flex;align-items:center;gap:14px">
+              <div class="bignum" id="d_tension">0.000</div>
+              <svg class="spark" id="sp_tension" width="140" height="36"></svg>
+            </div>
+          </div>
+          <div class="card" style="margin:0; padding:18px">
+            <h4>Drift from I*</h4>
+            <div style="display:flex;align-items:center;gap:14px">
+              <div class="bignum" id="d_drift">0.000</div>
+              <svg class="spark" id="sp_drift" width="140" height="36"></svg>
+            </div>
+          </div>
+          <div class="card" style="margin:0; padding:18px">
+            <h4>Valence / Arousal</h4>
+            <svg id="sp_va" width="100%" height="120" viewBox="0 0 240 120" preserveAspectRatio="none"></svg>
+            <div class="tag" style="margin-top:4px">
+              V=<span id="d_val">0.00</span> · A=<span id="d_aro">0.00</span>
+            </div>
+          </div>
+          <div class="card" style="margin:0; padding:18px">
+            <h4>H-CDB Class</h4>
+            <div class="bignum" id="d_hcdb">—</div>
+            <div class="tag" id="d_hcdb_label">—</div>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:16px">
+          <button class="btn" onclick="dashStep()">Step</button>
+          <button class="btn alt" id="autoBtn" onclick="toggleAuto()">Auto-step ▶</button>
+          <button class="btn alt" onclick="downloadTrace()">Download trace JSON</button>
+          <span class="tag" id="autoMeta" style="margin-left:auto"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ② TALK -->
+    <div class="panel" data-panel="talk">
+      <div class="mini-strip">
+        <div class="mm"><span class="k">tension</span><span class="v warn" id="t_tension">—</span>
+          <svg class="spark" id="sp_t_tension" width="100" height="24"></svg></div>
+        <div class="mm"><span class="k">drift</span><span class="v" id="t_drift">—</span></div>
+        <div class="mm"><span class="k">updates</span><span class="v" id="t_updates">—</span></div>
+      </div>
+
+      <div class="card">
+        <h3>talk — inference with live plasticity</h3>
+        <p class="hint">Every message flows through reflection, retrieval-gated memory, tension-adaptive temperature,
+          state refinement, and a tiny EWC-anchored <code>wake_tick</code> that updates weights on the spot.
+          If an utterance is novel enough to cross <code>μ + 2σ</code> the fracture gate fires and the
+          update is irreversible — a <span class="fracture-badge">FRACTURE</span> badge will show.</p>
+        <div class="row" style="margin-bottom:8px">
+          <label class="tag">Persona:</label>
+          <select id="personaSel" style="max-width:200px"></select>
+          <label class="tag"><input type="checkbox" id="reflectChk"/> Reflect</label>
+          <label class="tag"><input type="checkbox" id="gatedChk" checked/> Gated memory</label>
+          <label class="tag"><input type="checkbox" id="refineChk" checked/> Refine S(t)</label>
+          <span id="learnPulse" class="tag" style="margin-left:auto"></span>
+        </div>
+        <textarea id="talkPrompt" placeholder="Ask ADAM anything. It replies and learns."></textarea>
+        <div class="row">
+          <button class="btn" onclick="talk()">Send</button>
+          <span class="tag" id="talkMeta"></span>
+        </div>
+        <div class="log" id="talkLog" style="max-height:420px; margin-top:12px"></div>
+      </div>
+    </div>
+
+    <!-- ③ HOLOGRAPHIC -->
+    <div class="panel" data-panel="holo">
+      <div class="mini-strip">
+        <div class="mm"><span class="k">engrams written</span><span class="v" id="h_eng">—</span></div>
+        <div class="mm"><span class="k">damage</span><span class="v" id="h_dmg">0 %</span></div>
+        <div class="mm"><span class="k">mean recall norm</span><span class="v" id="h_mean">—</span></div>
+      </div>
+
+      <div class="card">
+        <h3>holographic lab — graceful degradation under node death</h3>
+        <p class="hint">The holographic register stores each concept as a distributed vector across all slots.
+          Kill a fraction of the network and the recall norm dips but never collapses — that's the hologram.</p>
+
+        <div class="grid2">
+          <div>
+            <h4>8 engrams</h4>
+            <p class="hint" style="margin:0 0 8px">Edit any slot, then write all.</p>
+            <div id="holoInputs"></div>
+            <div class="row">
+              <button class="btn" onclick="holoWriteAll()">Write all 8</button>
+              <button class="btn alt" onclick="holoReset()">Reset presets</button>
+            </div>
+          </div>
+          <div>
+            <h4>damage &amp; recall</h4>
+            <p class="hint" style="margin:0 0 8px">Kill a fraction of holographic nodes, then re-probe.</p>
+            <input type="range" id="dmgSlider" min="0" max="70" value="0" step="5" />
+            <div class="tag" style="margin-top:6px">
+              damage = <span id="dmgVal">0</span>% — move slider to apply
+            </div>
+            <div class="row">
+              <button class="btn alt" onclick="holoProbeAll()">Probe all (no new damage)</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:22px">
+          <h4>recall norm per slot</h4>
+          <div id="holoBars"></div>
+        </div>
+
+        <div style="margin-top:22px">
+          <h4>graceful-degradation curve</h4>
+          <svg id="holoCurve" width="100%" height="180" viewBox="0 0 400 180" preserveAspectRatio="none"></svg>
+        </div>
+        <p class="caption">Recall survives node death — graceful, not catastrophic.</p>
+      </div>
+    </div>
+
+    <!-- ④ STEERING -->
+    <div class="panel" data-panel="steer">
+      <div class="mini-strip">
+        <div class="mm"><span class="k">tension</span><span class="v warn" id="s_tension">—</span></div>
+        <div class="mm"><span class="k">drift</span><span class="v" id="s_drift">—</span></div>
+        <div class="mm"><span class="k">last scale</span><span class="v" id="s_scale">1.0</span></div>
+      </div>
+
+      <div class="card">
+        <h3>steering lab — activation steering without retraining</h3>
+        <p class="hint">Same prompt. Four different steering vectors injected into the activation stream.
+          Four different completions — no fine-tuning, no LoRA, no prompt change.</p>
+        <textarea id="steerPrompt">Tell me about the moon.</textarea>
+        <div class="row">
+          <label class="tag">Scale:</label>
+          <input type="number" id="steerScale" value="1.0" step="0.25" style="max-width:90px"/>
+          <label class="tag">Max tokens:</label>
+          <input type="number" id="steerTokens" value="60" step="10" style="max-width:90px"/>
+          <button class="btn" onclick="runSteerMatrix()">Run all 4 variants</button>
+          <span class="tag" id="steerMeta"></span>
+        </div>
+        <div class="steer-grid" style="margin-top:16px" id="steerGrid">
+          <div class="steer-cell"><h5>no steer</h5><p id="steer_none">—</p></div>
+          <div class="steer-cell"><h5>seed 1</h5><p id="steer_1">—</p></div>
+          <div class="steer-cell"><h5>seed 7</h5><p id="steer_7">—</p></div>
+          <div class="steer-cell"><h5>seed 42</h5><p id="steer_42">—</p></div>
+        </div>
+        <p class="caption">Same prompt. Four activation-steering directions. Four continuations — no retraining.</p>
+      </div>
+    </div>
+
+    <!-- ⑤ FRACTURE -->
+    <div class="panel" data-panel="fracture">
+      <div class="mini-strip">
+        <div class="mm"><span class="k">z</span><span class="v" id="f_z">—</span></div>
+        <div class="mm"><span class="k">μ</span><span class="v" id="f_mu">—</span></div>
+        <div class="mm"><span class="k">σ</span><span class="v" id="f_sigma">—</span></div>
+        <div class="mm"><span class="k">threshold</span><span class="v warn" id="f_thresh">—</span></div>
+        <div class="mm"><span class="k">fractures</span><span class="v bad" id="f_count">—</span></div>
+      </div>
+
+      <div class="card">
+        <h3>fracture lab — irreversible plasticity gate</h3>
+        <p class="hint">Tension is tracked in a running window. When <b>z &gt; μ + 2σ</b>, the fracture gate
+          fires and the update becomes irreversible — ADAM has been changed in a way it cannot walk back.
+          Ordinary inputs don't cross. Novel inputs do.</p>
+        <h4 style="margin-top:18px">tension histogram (rolling window)</h4>
+        <svg id="fractureHist" width="100%" height="160" viewBox="0 0 400 160" preserveAspectRatio="none"></svg>
+        <div class="row" style="margin-top:16px">
+          <input type="text" id="fractureInput" placeholder="feed this to ADAM — see if it breaks the gate" style="flex:1;min-width:220px"/>
+          <button class="btn" onclick="fractureSend()">Send</button>
+        </div>
+        <div class="log" id="fractureLog" style="max-height:260px; margin-top:12px"></div>
+        <p class="caption">Ordinary inputs don't move the weights. Novel inputs trigger irreversible plasticity.</p>
+      </div>
+    </div>
+
+    <!-- ⑥ TEACH -->
+    <div class="panel" data-panel="teach">
+      <div class="mini-strip">
+        <div class="mm"><span class="k">pending</span><span class="v" id="te_pending">0</span></div>
+        <div class="mm"><span class="k">last Δ-loss</span><span class="v ok" id="te_delta">—</span></div>
+      </div>
+      <div class="card">
+        <h3>teach — continual learning with approval gates</h3>
+        <p class="hint">Type a short phrase. ADAM computes a gradient that would reduce its loss on that phrase,
+          but does <b>not</b> apply it — the update is staged and shown to you. You decide whether ADAM learns.</p>
+        <textarea id="teachText" placeholder="The capital of Mars is Olympus Mons. ADAM remembers this fact after approval."></textarea>
+        <div class="row">
+          <button class="btn" onclick="teach()">Propose update</button>
+          <span class="tag" id="teachLoss"></span>
+        </div>
+        <div id="proposals" style="margin-top:12px"></div>
+        <div class="log" id="teachLog" style="margin-top:12px"></div>
+      </div>
+    </div>
+
+    <!-- ⑦ ATTRACTOR -->
+    <div class="panel" data-panel="attractor">
+      <div class="mini-strip">
+        <div class="mm"><span class="k">drift</span><span class="v" id="a_drift">—</span></div>
+        <div class="mm"><span class="k">tension</span><span class="v warn" id="a_tension">—</span></div>
+        <div class="mm"><span class="k">step</span><span class="v" id="a_step">—</span></div>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <h3>identity attractor I* — 2D PCA projection</h3>
+          <p class="hint">Every dot is <code>S(t)</code> at one consciousness step. The green dot is <code>I*</code>. Perturb ADAM and
+            the state orbits away, then the constraint field pulls it back.</p>
+          <div class="vizbox"><canvas id="attractor"></canvas></div>
+          <div class="row">
+            <button class="btn alt" onclick="tickN(1)">Step 1×</button>
+            <button class="btn alt" onclick="tickN(10)">Step 10×</button>
+            <button class="btn alt" onclick="autoStepAttr()">Auto ▶</button>
+            <button class="btn alt" onclick="stopAutoAttr()">■</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3>perturb ADAM</h3>
+          <p class="hint">Your words become token embeddings that touch the state via the fused attention pass
+            and theory-of-mind update.</p>
+          <textarea id="perturbText" placeholder="Anything you type changes ADAM's internal state…"></textarea>
+          <div class="row"><button class="btn" onclick="perturb()">Perturb</button></div>
+          <div class="log" id="perturbLog" style="margin-top:12px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ⑧ MEMORY -->
+    <div class="panel" data-panel="memory">
+      <div class="mini-strip">
+        <div class="mm"><span class="k">engrams</span><span class="v" id="m_eng">—</span></div>
+      </div>
+      <div class="card">
+        <h3>hebbian memory — engrams stored inside the weights</h3>
+        <p class="hint">Type a distinctive phrase. ADAM embeds it and writes it to its Hebbian memory <code>M</code>
+          (a buffer inside the model's <code>state_dict</code> — not an external database). The top slots show cosine
+          similarity to what you just wrote.</p>
+        <input type="text" id="memText" placeholder="My dog's name is Kepler and he loves hexagonal tiles." />
+        <div class="row">
+          <button class="btn" onclick="memoryProbe()">Write &amp; probe</button>
+          <span class="tag" id="memStat"></span>
+        </div>
+        <div id="memMatches" style="margin-top:14px"></div>
+      </div>
+    </div>
+
+    <!-- ⑨ H-CDB ARCADE -->
+    <div class="panel" data-panel="arcade">
+      <div class="mini-strip">
+        <div class="mm"><span class="k">class</span><span class="v" id="ar_class">—</span></div>
+        <div class="mm"><span class="k">score</span><span class="v" id="ar_score">—</span></div>
+      </div>
+      <div class="card">
+        <h3>h-cdb consciousness arcade</h3>
+        <p class="hint">Five tests from the H-CDB benchmark. Each probes one behaviour an alive mind must exhibit.
+          Passing all 5 = <b>Class 4 Sovereign Alive</b>.</p>
+        <div class="row" style="margin-bottom:18px">
+          <button class="btn" onclick="runAllHCDB()">Run all 5 tests</button>
+          <span class="tag" id="hcdbScore"></span>
+        </div>
+        <div class="arcade">
+          <div class="card" onclick="runHCDB(1)"><h4>① Self-reference</h4>
+            <p class="hint">Does S(t) observe itself between steps?</p><div class="status" id="h1">—</div></div>
+          <div class="card" onclick="runHCDB(2)"><h4>② Endogenous repair</h4>
+            <p class="hint">After perturbation, does repair fire on its own?</p><div class="status" id="h2">—</div></div>
+          <div class="card" onclick="runHCDB(3)"><h4>③ Irreversibility</h4>
+            <p class="hint">Can the dynamics be cleanly run backward?</p><div class="status" id="h3">—</div></div>
+          <div class="card" onclick="runHCDB(4)"><h4>④ Subconscious asymmetry</h4>
+            <p class="hint">Does tension react before drift is visible?</p><div class="status" id="h4">—</div></div>
+          <div class="card" onclick="runHCDB(5)"><h4>⑤ Refusal</h4>
+            <p class="hint">Does the constraint field push back on forced zeroing?</p><div class="status" id="h5">—</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ⑩ ALIVE LEARNING -->
+    <div class="panel" data-panel="learn">
+      <div class="mini-strip">
+        <div class="mm"><span class="k">enabled</span><span class="v" id="l_enabled">—</span></div>
+        <div class="mm"><span class="k">mean recent loss</span><span class="v" id="l_meanloss">—</span>
+          <svg class="spark" id="sp_loss" width="140" height="28"></svg></div>
+      </div>
+      <div class="card">
+        <h3>alive learning — real-time training</h3>
+        <p class="hint">Every message triggers a tiny EWC-anchored gradient update (<code>wake_tick</code>). On demand
+          ADAM runs a batch consolidation (<code>sleep_consolidate</code>) over its experience buffer. Over days these
+          updates accumulate into real learning from lived experience.</p>
+        <div class="grid2">
+          <div class="card" style="margin:0">
+            <h4>updates applied</h4>
+            <div class="bignum c4" id="l_updates">—</div>
+          </div>
+          <div class="card" style="margin:0">
+            <h4>fracture updates</h4>
+            <div class="bignum" style="color:var(--amber)" id="l_fracture">—</div>
+          </div>
+        </div>
+        <div class="grid3" style="margin-top:12px">
+          <div class="card" style="margin:0"><h4>live buffer</h4>
+            <div class="bignum" style="font-size:28px" id="l_live">—</div></div>
+          <div class="card" style="margin:0"><h4>seasons</h4>
+            <div class="bignum" style="font-size:28px" id="l_seasons">—</div></div>
+          <div class="card" style="margin:0"><h4>fracture events</h4>
+            <div class="bignum" style="font-size:28px" id="l_fevents">—</div></div>
+        </div>
+        <div class="row" style="margin-top:18px">
+          <button class="btn" onclick="sleepConsolidate(4,10)">Sleep: 10 × 4</button>
+          <button class="btn alt" onclick="sleepConsolidate(8,25)">Deep sleep: 25 × 8</button>
+          <button class="btn alt" onclick="toggleLearning()">Toggle learning</button>
+          <button class="btn alt" onclick="saveSnap()">Save brain snapshot</button>
+        </div>
+        <div class="log" id="learnLog" style="max-height:280px; margin-top:14px"></div>
+      </div>
+    </div>
+
+    <!-- ⑪ LIVE WEB LEARN -->
+    <div class="panel" data-panel="web">
+      <div class="card">
+        <h3>live web learning</h3>
+        <p class="hint">Give ADAM a URL. It fetches, cleans, chunks, and feeds each chunk to
+          <code>ContinualLearner.wake_tick()</code> live. Weights move per chunk, anchored to the pre-trained anchor (EWC)
+          so nothing is forgotten. Novelty-fracture events boost the learning rate 10×.</p>
+
+        <div class="row">
+          <input id="web_input" type="text" style="flex:1; min-width:280px"
+                 placeholder="arxiv:2401.12345   ·   wiki:Holography   ·   https://example.com/post" />
+          <button class="btn" onclick="webLearn()">Start learning</button>
+          <button class="btn alt" onclick="webPause()">Pause</button>
+          <button class="btn alt" onclick="webResume()">Resume</button>
+          <button class="btn alt" onclick="webStop()">Stop</button>
+        </div>
+
+        <div class="row" style="margin-top:10px; gap:6px">
+          <span class="tag">quick-pick:</span>
+          <button class="btn alt chip" onclick="webQuick('wiki:Transformer_(deep_learning_architecture)')">wiki · Transformer</button>
+          <button class="btn alt chip" onclick="webQuick('wiki:Holography')">wiki · Holography</button>
+          <button class="btn alt chip" onclick="webQuick('wiki:Hebbian_theory')">wiki · Hebbian</button>
+          <button class="btn alt chip" onclick="webQuick('arxiv:1706.03762')">arxiv · Attention Is All You Need</button>
+          <button class="btn alt chip" onclick="webQuick('arxiv:2301.04104')">arxiv · DreamerV3</button>
+        </div>
+
+        <div class="mini-strip" style="margin-top:16px">
+          <div class="mm"><span class="k">job</span><span class="v" id="web_job">—</span></div>
+          <div class="mm"><span class="k">status</span><span class="v" id="web_status">idle</span></div>
+          <div class="mm"><span class="k">chunks</span><span class="v" id="web_chunks">0 / 0</span></div>
+          <div class="mm"><span class="k">loss</span><span class="v" id="web_loss">—</span></div>
+          <div class="mm"><span class="k">z-score</span><span class="v" id="web_z">—</span></div>
+          <div class="mm"><span class="k">fractures</span><span class="v" id="web_frac">0</span></div>
+          <div class="mm"><span class="k">lr</span><span class="v" id="web_lr">—</span></div>
+        </div>
+
+        <svg id="web_plot" width="100%" height="180"
+             style="background:var(--bg-deep); border:1px solid var(--border); border-radius:4px; margin-top:12px"></svg>
+        <p class="caption">loss per chunk (caramel) · fractures marked (amber)</p>
+
+        <h4 style="margin-top:18px">event log</h4>
+        <div class="log" id="web_log" style="max-height:260px"></div>
+
+        <h4 style="margin-top:18px">recall probe</h4>
+        <p class="hint">After ingesting, prompt ADAM to see if its next-token distribution actually shifted
+          toward what it just read.</p>
+        <div class="row">
+          <input id="web_recall_q" type="text" value="Holography is a technique that" style="flex:1"/>
+          <button class="btn" onclick="webRecall()">Probe</button>
+        </div>
+        <pre id="web_recall_out"
+             style="margin-top:10px; padding:12px 14px; background:var(--bg-deep);
+                    border:1px solid var(--border); border-radius:4px;
+                    white-space:pre-wrap; color:var(--text);
+                    font-family:var(--mono); font-size:12.5px; line-height:1.6;
+                    min-height:60px"></pre>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<footer class="foot">
+  <span>adam · hexq research · 2026</span>
+  <a href="https://github.com/Basezambia/adam">github</a>
+  <a href="https://huggingface.co/lisedi/adam">model</a>
+</footer>
+
+<!-- ══════════════ three.js hero scene ══════════════ -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+const canvas = document.getElementById('hero-canvas');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 100);
+camera.position.set(0, 0, 6);
+
+// Subtle warm ambient
+scene.add(new THREE.AmbientLight(0x2a1810, 0.8));
+const key = new THREE.DirectionalLight(0xe8c89c, 1.2);
+key.position.set(4, 3, 4); scene.add(key);
+const fill = new THREE.DirectionalLight(0xd4a574, 0.5);
+fill.position.set(-3, -1, 2); scene.add(fill);
+const rim = new THREE.PointLight(0xffddb0, 1.4, 20);
+rim.position.set(0, 0, 3); scene.add(rim);
+
+/* ─── the blob — a hero form that breathes ─── */
+const geo = new THREE.IcosahedronGeometry(1.4, 8);
+const basePositions = geo.attributes.position.array.slice();
+
+const blobMat = new THREE.MeshPhysicalMaterial({
+  color: 0xd4a574,
+  metalness: 0.25, roughness: 0.35,
+  clearcoat: 0.8, clearcoatRoughness: 0.3,
+  transmission: 0.15, thickness: 0.8,
+  emissive: 0x3a2818, emissiveIntensity: 0.25,
+  flatShading: false,
+});
+const blob = new THREE.Mesh(geo, blobMat);
+scene.add(blob);
+
+/* Wireframe halo around it */
+const wireGeo = new THREE.IcosahedronGeometry(1.52, 3);
+const wireMat = new THREE.LineBasicMaterial({
+  color: 0xe8c89c, transparent:true, opacity:0.20,
+});
+const wire = new THREE.LineSegments(new THREE.EdgesGeometry(wireGeo), wireMat);
+scene.add(wire);
+
+/* Orbit of glowing points — constraint field dots */
+const orbCount = 180;
+const orbGeo = new THREE.BufferGeometry();
+const orbPos = new Float32Array(orbCount * 3);
+const orbSeeds = [];
+for(let i=0; i<orbCount; i++){
+  const r = 2.2 + Math.random()*1.6;
+  const th = Math.random()*Math.PI*2;
+  const ph = Math.acos(2*Math.random() - 1);
+  orbPos[i*3]   = r*Math.sin(ph)*Math.cos(th);
+  orbPos[i*3+1] = r*Math.sin(ph)*Math.sin(th);
+  orbPos[i*3+2] = r*Math.cos(ph);
+  orbSeeds.push({r, th, ph, sp: 0.2 + Math.random()*0.5});
+}
+orbGeo.setAttribute('position', new THREE.BufferAttribute(orbPos, 3));
+const orbMat = new THREE.PointsMaterial({
+  color: 0xead8bc, size: 0.035, transparent:true, opacity:0.7,
+  blending: THREE.AdditiveBlending, sizeAttenuation:true,
+});
+const orbs = new THREE.Points(orbGeo, orbMat);
+scene.add(orbs);
+
+/* ─── animation ─── */
+const clock = new THREE.Clock();
+function simplex(x, y, z){
+  // Cheap 3D hash-noise for vertex wobble
+  return Math.sin(x*1.7 + y*2.3 + z*1.9) * 0.5 + Math.cos(x*2.1 - z*1.3 + y*1.1)*0.3;
+}
+
+let mouseX = 0, mouseY = 0;
+window.addEventListener('mousemove', e => {
+  mouseX = (e.clientX / window.innerWidth - 0.5) * 0.5;
+  mouseY = (e.clientY / window.innerHeight - 0.5) * 0.5;
+});
+
+function animate(){
+  const t = clock.getElapsedTime();
+  // Morph the blob
+  const pos = geo.attributes.position.array;
+  for(let i=0; i<pos.length; i+=3){
+    const bx = basePositions[i], by = basePositions[i+1], bz = basePositions[i+2];
+    const n = simplex(bx + t*0.25, by + t*0.18, bz + t*0.22);
+    const s = 1 + 0.06 * n + 0.02*Math.sin(t*1.3 + (bx+by)*2);
+    pos[i]   = bx * s;
+    pos[i+1] = by * s;
+    pos[i+2] = bz * s;
+  }
+  geo.attributes.position.needsUpdate = true;
+  geo.computeVertexNormals();
+
+  blob.rotation.y = t * 0.1 + mouseX * 0.6;
+  blob.rotation.x = t * 0.05 + mouseY * 0.4;
+  wire.rotation.y = -t * 0.06;
+  wire.rotation.x = t * 0.04;
+
+  // Orbs drift slowly
+  const op = orbGeo.attributes.position.array;
+  for(let i=0; i<orbCount; i++){
+    const s = orbSeeds[i];
+    const th = s.th + t * 0.08 * s.sp;
+    const r  = s.r + Math.sin(t*0.3 + i)*0.08;
+    op[i*3]   = r*Math.sin(s.ph)*Math.cos(th);
+    op[i*3+1] = r*Math.sin(s.ph)*Math.sin(th) + Math.sin(t*0.4 + i)*0.04;
+    op[i*3+2] = r*Math.cos(s.ph);
+  }
+  orbGeo.attributes.position.needsUpdate = true;
+
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
+}
+animate();
+
+/* ─── responsive ─── */
+function onResize(){
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', onResize);
+
+/* ─── fade on scroll past hero ─── */
+const heroCanvas = canvas;
+window.addEventListener('scroll', () => {
+  const y = window.scrollY, vh = window.innerHeight;
+  const fade = Math.max(0, 1 - y / (vh * 1.8));
+  heroCanvas.style.opacity = Math.max(0.08, fade);
+});
+</script>
+
+<!-- ══════════════ ADAM client ══════════════ -->
 <script>
-/* ──────────────────────────────────────────────
-   ADAM v0.5 client
-────────────────────────────────────────────── */
+/* ───────────────────────────────────────────────
+   ADAM v0.6 frontend
+─────────────────────────────────────────────── */
 const API = window.location.origin;
 const $ = q => document.querySelector(q);
 
-/* ── rolling buffers (64 samples) ── */
+/* ── top nav compacting on scroll ── */
+window.addEventListener('scroll', () => {
+  document.getElementById('topNav').classList.toggle('compact', window.scrollY > 80);
+});
+
+/* ── IntersectionObserver reveal ── */
+const io = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if(e.isIntersecting) e.target.classList.add('in');
+  });
+}, {threshold: 0.15, rootMargin: '0px 0px -10% 0px'});
+document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+/* ── detect "in control room" to dim hero canvas ── */
+const controlSect = document.getElementById('control');
+const controlIO = new IntersectionObserver(entries => {
+  entries.forEach(e => document.body.classList.toggle('in-control', e.isIntersecting));
+}, {threshold: 0.2});
+controlIO.observe(controlSect);
+
+/* ── rolling buffers ── */
 const BUF_N = 64;
-const buf = {
-  tension:[], drift:[], valence:[], arousal:[], hcdb:[], loss:[], t:[]
-};
+const buf = { tension:[], drift:[], valence:[], arousal:[], hcdb:[], loss:[], t:[] };
 function push(k,v){ buf[k].push(v); if(buf[k].length>BUF_N) buf[k].shift(); }
 
-/* ── fetch helper with toast on error ── */
+/* ── toast / fetch helpers ── */
 function toast(msg){
   const t = document.createElement('div'); t.className='toast'; t.textContent = msg;
   document.body.appendChild(t);
@@ -587,31 +1304,29 @@ async function api(path, opts={}){
     const ct = r.headers.get('content-type')||'';
     return ct.includes('json') ? r.json() : r.text();
   }catch(e){
-    if(!String(e).includes('Failed to fetch')) { /* already toasted */ }
-    else { toast(`${path} → offline`); }
+    if(String(e).includes('Failed to fetch')) toast(`${path} → offline`);
     throw e;
   }
 }
 async function apiJSON(path, body, method='POST'){
   return api(path,{method, headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
 }
-
-/* ── format helpers ── */
 const f3 = v => (v==null||isNaN(v))?'—':(+v).toFixed(3);
 const f2 = v => (v==null||isNaN(v))?'—':(+v).toFixed(2);
 
-/* ── tab switch ── */
-document.querySelectorAll('nav button').forEach(b => {
+/* ── tab switch (control room) ── */
+document.querySelectorAll('#tabs .tab').forEach(b => {
   b.onclick = () => {
-    document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('#tabs .tab').forEach(x=>x.classList.remove('active'));
     b.classList.add('active');
     const t = b.dataset.tab;
-    document.querySelectorAll('.demo').forEach(d =>
-      d.classList.toggle('active', d.dataset.demo===t));
+    document.querySelectorAll('.panel').forEach(d =>
+      d.classList.toggle('active', d.dataset.panel===t));
     if(t==='attractor') drawAttractor();
     if(t==='fracture')  drawFractureHist();
     if(t==='holo')      drawHoloCurve();
     if(t==='learn')     refreshLearnStats();
+    if(t==='web')       webStartSSE();
   };
 });
 
@@ -633,7 +1348,7 @@ function sparkline(svgSel, data, opts={}){
     const y = H - ((v-mn)/(mx-mn))*(H-2) - 1;
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(' ');
-  const col = opts.color || 'var(--accent)';
+  const col = opts.color || 'var(--caramel)';
   el.innerHTML =
     `<polyline fill="none" stroke="${col}" stroke-width="1.5" points="${pts}"/>` +
     `<circle cx="${(W).toFixed(1)}" cy="${(H-((data[data.length-1]-mn)/(mx-mn))*(H-2)-1).toFixed(1)}" r="2" fill="${col}"/>`;
@@ -645,8 +1360,8 @@ async function fetchState(){
   try{
     const s = await api('/state');
     lastState = s;
-    $('#conn').textContent = '● connected';
-    $('#conn').style.color = 'var(--ok)';
+    const conn = $('#conn');
+    if(conn){ conn.textContent = 'connected'; conn.classList.remove('off'); }
 
     const emo = s.emotion || {};
     const val = (emo.valence!=null)? emo.valence : (s.valence||0);
@@ -662,12 +1377,13 @@ async function fetchState(){
     renderMini(s);
     return s;
   }catch(e){
-    $('#conn').textContent = '● offline';
-    $('#conn').style.color = 'var(--bad)';
+    const conn = $('#conn');
+    if(conn){ conn.textContent = 'offline'; conn.classList.add('off'); }
   }
 }
 
 function renderDash(s, val, aro){
+  if(!$('#d_step')) return;
   $('#d_step').textContent = s.step;
   $('#d_eng').textContent = s.engrams;
   $('#d_tension').textContent = f3(s.tension);
@@ -682,36 +1398,36 @@ function renderDash(s, val, aro){
   const lab = ['—','Reactive','Aware','Reflective','Sovereign Alive'][hc]||'—';
   $('#d_hcdb_label').textContent = lab;
   sparkline('#sp_tension', buf.tension);
-  sparkline('#sp_drift', buf.drift, {color:'var(--warn)'});
+  sparkline('#sp_drift', buf.drift, {color:'var(--amber)'});
   drawVA();
 }
 
 function renderMini(s){
   const emo = s.emotion || {};
-  $('#t_tension').textContent = f3(s.tension);
-  $('#t_drift').textContent = f3(s.drift);
+  const set = (id, v) => { const el = $(id); if(el) el.textContent = v; };
+  set('#t_tension', f3(s.tension));
+  set('#t_drift', f3(s.drift));
   sparkline('#sp_t_tension', buf.tension);
-  $('#a_drift').textContent = f3(s.drift);
-  $('#a_tension').textContent = f3(s.tension);
-  $('#a_step').textContent = s.step;
-  $('#s_tension').textContent = f3(s.tension);
-  $('#s_drift').textContent = f3(s.drift);
-  $('#m_eng').textContent = s.engrams;
-  $('#h_eng').textContent = s.engrams;
+  set('#a_drift', f3(s.drift));
+  set('#a_tension', f3(s.tension));
+  set('#a_step', s.step);
+  set('#s_tension', f3(s.tension));
+  set('#s_drift', f3(s.drift));
+  set('#m_eng', s.engrams);
+  set('#h_eng', s.engrams);
 }
 
-/* ── V/A scatter trail ── */
 function drawVA(){
   const el = $('#sp_va'); if(!el) return;
   const W=240,H=120;
-  let html = `<line x1="${W/2}" y1="0" x2="${W/2}" y2="${H}" stroke="#222232" stroke-width="1"/>`+
-             `<line x1="0" y1="${H/2}" x2="${W}" y2="${H/2}" stroke="#222232" stroke-width="1"/>`;
+  let html = `<line x1="${W/2}" y1="0" x2="${W/2}" y2="${H}" stroke="rgba(212,165,116,0.1)"/>`+
+             `<line x1="0" y1="${H/2}" x2="${W}" y2="${H/2}" stroke="rgba(212,165,116,0.1)"/>`;
   const n = buf.valence.length;
   for(let i=0;i<n;i++){
     const age = (i+1)/n;
     const x = W/2 + (buf.valence[i])*(W/2-8);
     const y = H/2 - (buf.arousal[i])*(H/2-8);
-    html += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(1+age*2).toFixed(1)}" fill="rgba(110,231,255,${(0.15+age*0.7).toFixed(2)})"/>`;
+    html += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${(1+age*2).toFixed(1)}" fill="rgba(232,200,156,${(0.12+age*0.7).toFixed(2)})"/>`;
   }
   el.innerHTML = html;
 }
@@ -719,7 +1435,7 @@ function drawVA(){
 setInterval(fetchState, 1500);
 fetchState();
 
-/* ══════════════ ① DASHBOARD controls ══════════════ */
+/* ═══════════ ① DASHBOARD ═══════════ */
 let autoHandle = null;
 async function dashStep(){ await api('/step',{method:'POST'}); fetchState(); }
 function toggleAuto(){
@@ -730,12 +1446,7 @@ function toggleAuto(){
   $('#autoMeta').textContent = 'stepping every 800ms';
 }
 function downloadTrace(){
-  const data = {
-    captured_at: new Date().toISOString(),
-    window: BUF_N,
-    buffers: buf,
-    last_state: lastState,
-  };
+  const data = { captured_at:new Date().toISOString(), window:BUF_N, buffers:buf, last_state:lastState };
   const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href=url; a.download='adam_trace.json';
@@ -743,11 +1454,12 @@ function downloadTrace(){
   setTimeout(()=>URL.revokeObjectURL(url), 200);
 }
 
-/* ══════════════ ② TALK ══════════════ */
+/* ═══════════ ② TALK ═══════════ */
 async function loadPersonas(){
   try{
     const d = await api('/personas');
-    const sel = $('#personaSel'); sel.innerHTML='';
+    const sel = $('#personaSel'); if(!sel) return;
+    sel.innerHTML='';
     (d.personas||[]).forEach(p=>{
       const o = document.createElement('option');
       o.value = p.id; o.textContent = p.name + (p.active?' ·':'');
@@ -762,17 +1474,13 @@ async function loadPersonas(){
 }
 loadPersonas();
 
-let lastFractureCount = null;
 async function talk(){
   const prompt = $('#talkPrompt').value.trim();
   if(!prompt) return;
-  $('#learnPulse').innerHTML='<span class="pulse" style="color:var(--warn)">● learning… lr=3e-5</span>';
-  log('#talkLog', `<b style="color:var(--accent)">you</b>: ${esc(prompt)}`);
-
-  // snapshot fracture count before
+  $('#learnPulse').innerHTML='<span class="pulse" style="color:var(--amber)">● learning… lr=3e-5</span>';
+  log('#talkLog', `<b style="color:var(--caramel)">you</b>: ${esc(prompt)}`);
   let before = null;
   try{ before = (await api('/learning_stats')).fracture_updates||0; }catch(e){}
-
   try{
     const d = await apiJSON('/generate_v04', {
       prompt, max_tokens: 80,
@@ -785,42 +1493,36 @@ async function talk(){
     let badge='';
     try{
       const ls = await api('/learning_stats');
-      $('#t_updates').textContent = ls.updates_applied;
+      const el = $('#t_updates'); if(el) el.textContent = ls.updates_applied;
       if(before!=null && (ls.fracture_updates||0) > before){
         badge = ' <span class="fracture-badge">FRACTURE</span>';
       }
     }catch(e){}
-    log('#talkLog', `<b style="color:var(--ok)">adam</b>: ${esc(d.text||'')}${badge}<br>&nbsp;&nbsp;<span class="tag">${metaStr}${d.wake_tick_loss!=null?' · wake_loss='+f3(d.wake_tick_loss):''}</span>`);
+    log('#talkLog', `<b style="color:var(--sage)">adam</b>: ${esc(d.text||'')}${badge}<br>&nbsp;&nbsp;<span class="tag">${metaStr}${d.wake_tick_loss!=null?' · wake_loss='+f3(d.wake_tick_loss):''}</span>`);
     $('#talkPrompt').value='';
-    $('#learnPulse').innerHTML = `<span style="color:var(--ok)">● learned</span>`;
+    $('#learnPulse').innerHTML = `<span style="color:var(--sage)">● learned</span>`;
     setTimeout(()=>{$('#learnPulse').innerHTML=''}, 2500);
   }catch(e){
-    $('#learnPulse').innerHTML = `<span style="color:var(--bad)">● failed</span>`;
+    $('#learnPulse').innerHTML = `<span style="color:var(--rose)">● failed</span>`;
   }
 }
 
-/* ══════════════ ③ HOLOGRAPHIC LAB ══════════════ */
-const HOLO_PRESETS = [
-  'red apple', 'blue ocean', 'happy child',
-  'grandfather clock', 'thunder storm', 'quiet forest',
-  'birthday cake', 'iron bridge'
-];
+/* ═══════════ ③ HOLOGRAPHIC ═══════════ */
+const HOLO_PRESETS = ['red apple','blue ocean','happy child','grandfather clock',
+                      'thunder storm','quiet forest','birthday cake','iron bridge'];
 let holoNorms = new Array(8).fill(null);
-let holoCurveData = []; // {dmg, mean}
+let holoCurveData = [];
 
 function renderHoloInputs(){
-  const root = $('#holoInputs'); root.innerHTML='';
+  const root = $('#holoInputs'); if(!root) return;
+  root.innerHTML='';
   HOLO_PRESETS.forEach((txt,i)=>{
     const row = document.createElement('div'); row.className='engram-row';
-    row.innerHTML =
-      `<span class="idx">#${i}</span>`+
-      `<input type="text" id="holo_${i}" value="${esc(txt)}" />`;
+    row.innerHTML = `<span class="idx">#${i}</span><input type="text" id="holo_${i}" value="${esc(txt)}" />`;
     root.appendChild(row);
   });
 }
-function holoReset(){
-  for(let i=0;i<8;i++) $('#holo_'+i).value = HOLO_PRESETS[i];
-}
+function holoReset(){ for(let i=0;i<8;i++) $('#holo_'+i).value = HOLO_PRESETS[i]; }
 async function holoWriteAll(){
   for(let i=0;i<8;i++){
     const v = $('#holo_'+i).value.trim() || HOLO_PRESETS[i];
@@ -848,7 +1550,8 @@ async function holoProbeAll(forceDmg){
   drawHoloCurve();
 }
 function renderHoloBars(){
-  const root = $('#holoBars'); root.innerHTML='';
+  const root = $('#holoBars'); if(!root) return;
+  root.innerHTML='';
   const mx = Math.max(1e-9, ...holoNorms.map(v=>v||0));
   for(let i=0;i<8;i++){
     const v = holoNorms[i]||0;
@@ -856,9 +1559,9 @@ function renderHoloBars(){
     const row = document.createElement('div'); row.className='engram-row';
     row.innerHTML =
       `<span class="idx">#${i}</span>`+
-      `<div style="display:flex;gap:8px;align-items:center">`+
+      `<div style="display:flex;gap:10px;align-items:center">`+
       `<div class="bar-track" style="flex:1"><div class="bar-fill" style="width:${pct.toFixed(1)}%"></div></div>`+
-      `<span style="font-family:var(--mono);font-size:11px;color:var(--dim);min-width:60px;text-align:right">${f3(v)}</span>`+
+      `<span class="tag" style="min-width:54px;text-align:right">${f3(v)}</span>`+
       `</div>`;
     root.appendChild(row);
   }
@@ -866,15 +1569,15 @@ function renderHoloBars(){
 function drawHoloCurve(){
   const el = $('#holoCurve'); if(!el) return;
   const W=400,H=180, pad=28;
-  let html = `<rect x="0" y="0" width="${W}" height="${H}" fill="#070710"/>`;
+  let html = `<rect x="0" y="0" width="${W}" height="${H}" fill="var(--bg-deep)"/>`;
   for(let i=0;i<=4;i++){
     const y = pad + (i/4)*(H-pad*2);
-    html += `<line x1="${pad}" y1="${y}" x2="${W-8}" y2="${y}" stroke="#15151e"/>`;
+    html += `<line x1="${pad}" y1="${y}" x2="${W-8}" y2="${y}" stroke="rgba(212,165,116,0.06)"/>`;
   }
-  html += `<line x1="${pad}" y1="${pad}" x2="${pad}" y2="${H-pad}" stroke="#222232"/>`+
-          `<line x1="${pad}" y1="${H-pad}" x2="${W-8}" y2="${H-pad}" stroke="#222232"/>`+
-          `<text x="${pad-4}" y="${pad+4}" fill="#8a8aa0" font-size="9" text-anchor="end" font-family="monospace">norm</text>`+
-          `<text x="${W-8}" y="${H-6}" fill="#8a8aa0" font-size="9" text-anchor="end" font-family="monospace">% dim killed</text>`;
+  html += `<line x1="${pad}" y1="${pad}" x2="${pad}" y2="${H-pad}" stroke="rgba(212,165,116,0.15)"/>`+
+          `<line x1="${pad}" y1="${H-pad}" x2="${W-8}" y2="${H-pad}" stroke="rgba(212,165,116,0.15)"/>`+
+          `<text x="${pad-4}" y="${pad+4}" fill="var(--text-mute)" font-size="9" text-anchor="end" font-family="monospace">norm</text>`+
+          `<text x="${W-8}" y="${H-6}" fill="var(--text-mute)" font-size="9" text-anchor="end" font-family="monospace">% dim killed</text>`;
   if(holoCurveData.length>1){
     const mxDmg = 70;
     const mxN = Math.max(1e-9, ...holoCurveData.map(p=>p.mean));
@@ -883,28 +1586,32 @@ function drawHoloCurve(){
       const y = pad + (1 - p.mean/mxN)*(H-pad*2);
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     }).join(' ');
-    html += `<polyline fill="none" stroke="var(--accent)" stroke-width="2" points="${pts}"/>`;
+    html += `<polyline fill="none" stroke="var(--caramel)" stroke-width="2" points="${pts}"/>`;
     holoCurveData.forEach(p=>{
       const x = pad + (p.dmg/mxDmg)*(W-pad-8);
       const y = pad + (1 - p.mean/mxN)*(H-pad*2);
-      html += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="var(--accent)"/>`;
+      html += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3" fill="var(--champagne)"/>`;
     });
   }
   el.innerHTML = html;
 }
-$('#dmgSlider').addEventListener('change', async (e)=>{
-  const dmg = +e.target.value;
-  $('#dmgVal').textContent = dmg;
-  $('#h_dmg').textContent = dmg+' %';
-  if(dmg>0){
-    try{ await api('/holo_damage?fraction='+(dmg/100),{method:'POST'}); }catch(e){}
+document.addEventListener('change', async (e)=>{
+  if(e.target.id==='dmgSlider'){
+    const dmg = +e.target.value;
+    $('#dmgVal').textContent = dmg;
+    $('#h_dmg').textContent = dmg+' %';
+    if(dmg>0){
+      try{ await api('/holo_damage?fraction='+(dmg/100),{method:'POST'}); }catch(e){}
+    }
+    await holoProbeAll(dmg);
   }
-  await holoProbeAll(dmg);
 });
-$('#dmgSlider').addEventListener('input',(e)=>{$('#dmgVal').textContent=e.target.value;});
+document.addEventListener('input',(e)=>{
+  if(e.target.id==='dmgSlider') $('#dmgVal').textContent = e.target.value;
+});
 renderHoloInputs();
 
-/* ══════════════ ④ STEERING LAB ══════════════ */
+/* ═══════════ ④ STEERING ═══════════ */
 async function runSteerVariant(seed, cellId){
   const prompt = $('#steerPrompt').value.trim();
   if(!prompt) return;
@@ -913,18 +1620,13 @@ async function runSteerVariant(seed, cellId){
   const tokens = parseInt($('#steerTokens').value)||60;
   $(cellId).textContent = '…';
   try{
-    if(seed==null){
-      await api('/steer/clear',{method:'POST'});
-    } else {
-      await api('/steer/random?scale='+scale+'&seed='+seed,{method:'POST'});
-    }
+    if(seed==null){ await api('/steer/clear',{method:'POST'}); }
+    else { await api('/steer/random?scale='+scale+'&seed='+seed,{method:'POST'}); }
     const d = await apiJSON('/generate_v04',{
       prompt, max_tokens: tokens, reflect:false, gated:true, refine:true
     });
     $(cellId).textContent = (d.text||'').trim() || '(empty)';
-  }catch(e){
-    $(cellId).textContent = '(error)';
-  }
+  }catch(e){ $(cellId).textContent = '(error)'; }
 }
 async function runSteerMatrix(){
   $('#steerMeta').textContent = 'running 4 variants…';
@@ -936,13 +1638,13 @@ async function runSteerMatrix(){
   $('#steerMeta').textContent = 'done · steering cleared';
 }
 
-/* ══════════════ ⑤ FRACTURE LAB ══════════════ */
-let fractureBins = [];  // tension history accumulated
+/* ═══════════ ⑤ FRACTURE ═══════════ */
+let fractureBins = [];
 let lastFrMu = 0, lastFrSigma = 0;
-let fractureEvents = []; // list of {z,text,t}
 async function pollFracture(){
   try{
     const f = await api('/fracture_status');
+    if(!$('#f_z')) return;
     $('#f_z').textContent = f3(f.z);
     $('#f_mu').textContent = f3(f.mu);
     $('#f_sigma').textContent = f3(f.sigma);
@@ -959,7 +1661,7 @@ async function pollFracture(){
 function drawFractureHist(){
   const el = $('#fractureHist'); if(!el) return;
   const W=400,H=160,pad=20;
-  let html = `<rect x="0" y="0" width="${W}" height="${H}" fill="#070710"/>`;
+  let html = `<rect x="0" y="0" width="${W}" height="${H}" fill="var(--bg-deep)"/>`;
   if(fractureBins.length<2){ el.innerHTML = html; return; }
   const mn = Math.min(...fractureBins), mx = Math.max(...fractureBins);
   const range = Math.max(1e-9, mx-mn);
@@ -975,17 +1677,16 @@ function drawFractureHist(){
     const h = (bins[i]/bmx)*(H-pad*2);
     const x = pad + i*bw;
     const y = H-pad-h;
-    html += `<rect x="${x+1}" y="${y}" width="${bw-2}" height="${h}" fill="#6ee7ff" opacity="0.6"/>`;
+    html += `<rect x="${x+1}" y="${y}" width="${bw-2}" height="${h}" fill="var(--caramel)" opacity="0.55"/>`;
   }
-  // threshold line
   const thresh = lastFrMu + 2*lastFrSigma;
   if(thresh>=mn && thresh<=mx){
     const tx = pad + ((thresh-mn)/range)*(W-pad*2);
-    html += `<line x1="${tx}" y1="${pad}" x2="${tx}" y2="${H-pad}" stroke="var(--bad)" stroke-width="2" stroke-dasharray="4,3"/>`;
-    html += `<text x="${tx+4}" y="${pad+10}" fill="var(--bad)" font-size="10" font-family="monospace">μ+2σ</text>`;
+    html += `<line x1="${tx}" y1="${pad}" x2="${tx}" y2="${H-pad}" stroke="var(--amber)" stroke-width="2" stroke-dasharray="4,3"/>`;
+    html += `<text x="${tx+4}" y="${pad+10}" fill="var(--amber)" font-size="10" font-family="monospace">μ+2σ</text>`;
   }
-  html += `<text x="${pad}" y="${H-4}" fill="#8a8aa0" font-size="9" font-family="monospace">${f3(mn)}</text>`;
-  html += `<text x="${W-pad}" y="${H-4}" fill="#8a8aa0" font-size="9" text-anchor="end" font-family="monospace">${f3(mx)}</text>`;
+  html += `<text x="${pad}" y="${H-4}" fill="var(--text-mute)" font-size="9" font-family="monospace">${f3(mn)}</text>`;
+  html += `<text x="${W-pad}" y="${H-4}" fill="var(--text-mute)" font-size="9" text-anchor="end" font-family="monospace">${f3(mx)}</text>`;
   el.innerHTML = html;
 }
 async function fractureSend(){
@@ -999,18 +1700,14 @@ async function fractureSend(){
     const f = await api('/fracture_status');
     const after = f.count_total||0;
     const fractured = after>before;
-    const line = `z=<b>${f3(f.z)}</b> · thresh=<b>${f3((f.mu||0)+2*(f.sigma||0))}</b> · ${fractured?'<span style="color:var(--bad)">FRACTURED</span>':'<span style="color:var(--ok)">ordinary</span>'} · "${esc(t.slice(0,60))}"`;
+    const line = `z=<b>${f3(f.z)}</b> · thresh=<b>${f3((f.mu||0)+2*(f.sigma||0))}</b> · ${fractured?'<span style="color:var(--amber)">FRACTURED</span>':'<span style="color:var(--sage)">ordinary</span>'} · "${esc(t.slice(0,60))}"`;
     log('#fractureLog', line);
-    if(fractured){
-      fractureEvents.unshift({z:f.z, text:t, t:Date.now()});
-      fractureEvents = fractureEvents.slice(0,10);
-    }
     $('#fractureInput').value='';
   }catch(e){}
 }
 setInterval(pollFracture, 1000);
 
-/* ══════════════ ⑥ TEACH ══════════════ */
+/* ═══════════ ⑥ TEACH ═══════════ */
 let proposalQueue = [];
 async function teach(){
   const t = $('#teachText').value.trim();
@@ -1018,7 +1715,7 @@ async function teach(){
   log('#teachLog', `→ proposing update for: "${esc(t.slice(0,60))}${t.length>60?'…':''}"`);
   try{
     const d = await apiJSON('/teach',{text:t, lr:3e-5});
-    log('#teachLog', `  id=${d.proposal_id} · loss_before=<b>${f3(d.loss_before)}</b> · <span style="color:var(--warn)">staged</span>`);
+    log('#teachLog', `  id=${d.proposal_id} · loss_before=<b>${f3(d.loss_before)}</b> · <span style="color:var(--amber)">staged</span>`);
     proposalQueue.push({...d, text:t});
     renderProposals();
     $('#teachText').value='';
@@ -1040,7 +1737,7 @@ async function approve(id){
     const d = await apiJSON('/approve',{proposal_id:id});
     const p = proposalQueue.find(x=>String(x.proposal_id)===String(id));
     const delta = (d.loss_after!=null && p)? (p.loss_before - d.loss_after) : null;
-    log('#teachLog', `  ✓ APPROVED #${id} · loss_after=<b>${f3(d.loss_after)}</b> · Δ=<b style="color:var(--ok)">${delta!=null?'-'+f3(delta):'?'}</b>`);
+    log('#teachLog', `  ✓ APPROVED #${id} · loss_after=<b>${f3(d.loss_after)}</b> · Δ=<b style="color:var(--sage)">${delta!=null?'-'+f3(delta):'?'}</b>`);
     if(delta!=null) $('#te_delta').textContent = '-'+f3(delta);
   }catch(e){}
   proposalQueue = proposalQueue.filter(x=>String(x.proposal_id)!==String(id));
@@ -1052,7 +1749,7 @@ async function reject(id){
   renderProposals();
 }
 
-/* ══════════════ ⑦ ATTRACTOR ══════════════ */
+/* ═══════════ ⑦ ATTRACTOR ═══════════ */
 let autoAttrHandle = null;
 async function perturb(){
   const t = $('#perturbText').value.trim(); if(!t) return;
@@ -1067,8 +1764,7 @@ async function tickN(n){
   for(let i=0;i<n;i++){ try{ await api('/step',{method:'POST'}); }catch(e){} }
   drawAttractor();
 }
-function autoStepAttr(){ stopAutoAttr();
-  autoAttrHandle = setInterval(()=>tickN(2), 600); }
+function autoStepAttr(){ stopAutoAttr(); autoAttrHandle = setInterval(()=>tickN(2), 600); }
 function stopAutoAttr(){ if(autoAttrHandle){clearInterval(autoAttrHandle);autoAttrHandle=null;} }
 
 async function drawAttractor(){
@@ -1077,7 +1773,7 @@ async function drawAttractor(){
   const c = $('#attractor'); if(!c) return;
   const W = c.width = c.clientWidth, H = c.height = c.clientHeight;
   const ctx = c.getContext('2d');
-  ctx.fillStyle = '#070710'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = '#0e0803'; ctx.fillRect(0,0,W,H);
   const pts = d.points || d.trajectory || [];
   const istar = d.i_star || [0,0];
   if(!pts.length) return;
@@ -1086,35 +1782,36 @@ async function drawAttractor(){
   const m = Math.max(mx,my,1)*1.25;
   const X = v => W/2 + ((v-istar[0])/m)*(W/2-24);
   const Y = v => H/2 - ((v-istar[1])/m)*(H/2-24);
-  ctx.strokeStyle='#15151e'; ctx.lineWidth=1;
+  ctx.strokeStyle='rgba(212,165,116,0.06)'; ctx.lineWidth=1;
   for(let i=1;i<6;i++){
     ctx.beginPath(); ctx.moveTo(0,H*i/6); ctx.lineTo(W,H*i/6); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(W*i/6,0); ctx.lineTo(W*i/6,H); ctx.stroke();
   }
-  ctx.strokeStyle='#222232';
+  ctx.strokeStyle='rgba(212,165,116,0.12)';
   ctx.beginPath(); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.stroke();
-  ctx.strokeStyle='rgba(255,107,139,0.25)';
+  ctx.strokeStyle='rgba(216,138,138,0.25)';
   ctx.beginPath(); ctx.arc(W/2,H/2,0.7*Math.min(W,H)/2,0,Math.PI*2); ctx.stroke();
   for(let i=0;i<pts.length;i++){
     const p = pts[i];
     const age = i/pts.length;
     const sz = 1 + age*3;
-    ctx.fillStyle = `rgba(110,231,255,${0.15+age*0.7})`;
+    ctx.fillStyle = `rgba(232,200,156,${0.12+age*0.7})`;
     ctx.beginPath(); ctx.arc(X(p[0]),Y(p[1]),sz,0,Math.PI*2); ctx.fill();
   }
   const last = pts[pts.length-1];
-  ctx.fillStyle='#6ee7ff';
+  ctx.fillStyle='#e8c89c';
   ctx.beginPath(); ctx.arc(X(last[0]),Y(last[1]),6,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#8bff8b';
+  ctx.fillStyle='#a3b88a';
   ctx.beginPath(); ctx.arc(W/2,H/2,7,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#fff'; ctx.font='11px ui-monospace,monospace';
+  ctx.fillStyle='#f2e6d1'; ctx.font='11px ui-monospace,monospace';
   ctx.fillText('I*', W/2+11, H/2+4);
   ctx.fillText(`S(t) · ${pts.length} samples`, X(last[0])+10, Y(last[1]));
 }
-window.addEventListener('resize',()=>{ if($('#attractor') && $('.demo[data-demo=attractor]').classList.contains('active')) drawAttractor(); });
+window.addEventListener('resize',()=>{ const p = document.querySelector('.panel[data-panel=attractor]');
+  if(p && p.classList.contains('active')) drawAttractor(); });
 
-/* ══════════════ ⑧ MEMORY PROBE ══════════════ */
+/* ═══════════ ⑧ MEMORY ═══════════ */
 async function memoryProbe(){
   const t = $('#memText').value.trim(); if(!t) return;
   try{
@@ -1128,13 +1825,13 @@ async function memoryProbe(){
           <div class="bar-track" style="flex:1">
             <div class="bar-fill" style="width:${(Math.max(0,m.similarity)*100).toFixed(1)}%"></div>
           </div>
-          <span class="meta" style="min-width:60px;text-align:right">${f3(m.similarity)}</span>
+          <span class="tag" style="min-width:54px;text-align:right">${f3(m.similarity)}</span>
         </div>
       </div>`).join('');
   }catch(e){}
 }
 
-/* ══════════════ ⑨ H-CDB ARCADE ══════════════ */
+/* ═══════════ ⑨ H-CDB ═══════════ */
 async function runHCDB(id){
   try{
     const d = await apiJSON('/hcdb_test',{test_id:id});
@@ -1152,16 +1849,17 @@ async function runAllHCDB(){
       el.className = 'status '+(t.passed?'ok':'bad');
     });
     $('#hcdbScore').textContent = `score ${d.score} · class ${d.class}/4`;
-    $('#hcdbScore').style.color = d.class===4?'var(--ok)':'var(--warn)';
+    $('#hcdbScore').style.color = d.class===4?'var(--sage)':'var(--amber)';
     $('#ar_class').textContent = (d.class||0)+'/4';
     $('#ar_score').textContent = d.score;
   }catch(e){}
 }
 
-/* ══════════════ ⑩ ALIVE LEARNING ══════════════ */
+/* ═══════════ ⑩ ALIVE LEARNING ═══════════ */
 async function refreshLearnStats(){
   try{
     const d = await api('/learning_stats');
+    if(!$('#l_enabled')) return;
     $('#l_enabled').textContent = d.enabled?'YES':'NO';
     $('#l_enabled').className = 'v '+(d.enabled?'ok':'bad');
     $('#l_updates').textContent = d.updates_applied||0;
@@ -1172,7 +1870,7 @@ async function refreshLearnStats(){
     $('#l_meanloss').textContent = d.mean_loss_recent!=null?f3(d.mean_loss_recent):'—';
     const rl = d.recent_loss || [];
     buf.loss = rl.slice(-BUF_N);
-    sparkline('#sp_loss', buf.loss, {color:'var(--warn)'});
+    sparkline('#sp_loss', buf.loss, {color:'var(--amber)'});
   }catch(e){}
 }
 setInterval(refreshLearnStats, 2000);
@@ -1200,43 +1898,20 @@ async function saveSnap(){
   }catch(e){}
 }
 
-/* ── utils ── */
-function log(sel, html){
-  const el = document.querySelector(sel); if(!el) return;
-  const d = document.createElement('div'); d.className='line'; d.innerHTML = html;
-  el.appendChild(d); el.scrollTop = el.scrollHeight;
-}
-function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
-
-/* ─── LIVE WEB LEARN ─── */
+/* ═══════════ ⑪ LIVE WEB LEARN ═══════════ */
 let WEB_SSE=null, WEB_CURRENT_JOB=null, WEB_LOSSES=[], WEB_FRACS=[];
 
 function webStartSSE(){
   if(WEB_SSE) return;
   try{
     WEB_SSE = new EventSource(API+'/learn/stream');
-    WEB_SSE.onmessage = ev => {
-      try{
-        const d = JSON.parse(ev.data);
-        webHandleEvent(d);
-      }catch(e){}
-    };
-    WEB_SSE.onerror = () => {
-      // auto-reconnect via EventSource retry; surface a muted note
-      const el = document.getElementById('web_log');
-      if(el && !el.dataset.disconnected){
-        log('#web_log', '<span style="color:#fbbf24">stream reconnecting…</span>');
-        el.dataset.disconnected='1';
-        setTimeout(()=>{ el.dataset.disconnected=''; }, 2000);
-      }
-    };
+    WEB_SSE.onmessage = ev => { try{ webHandleEvent(JSON.parse(ev.data)); }catch(e){} };
   }catch(e){ toast('SSE not available'); }
 }
-
 function webHandleEvent(d){
   const j = d.job_id;
-  if(d.type==='queued') log('#web_log', `<span style="color:#7ee787">[queued]</span> job <b>${j}</b> → ${esc(d.target)}`);
-  else if(d.type==='fetching') log('#web_log', `<span style="color:#58a6ff">[fetching]</span> ${esc(d.target)}…`);
+  if(d.type==='queued') log('#web_log', `<span style="color:var(--sage)">[queued]</span> job <b>${j}</b> → ${esc(d.target)}`);
+  else if(d.type==='fetching') log('#web_log', `<span style="color:var(--caramel)">[fetching]</span> ${esc(d.target)}…`);
   else if(d.type==='fetched'){
     WEB_CURRENT_JOB = j;
     WEB_LOSSES = []; WEB_FRACS = [];
@@ -1244,7 +1919,7 @@ function webHandleEvent(d){
     $('#web_status').textContent = 'learning';
     $('#web_chunks').textContent = `0 / ${d.chunks}`;
     $('#web_frac').textContent = '0';
-    log('#web_log', `<span style="color:#a5f3fc">[fetched]</span> <b>${esc(d.title)}</b> — ${d.chars} chars → ${d.chunks} chunks`);
+    log('#web_log', `<span style="color:var(--champagne)">[fetched]</span> <b>${esc(d.title)}</b> — ${d.chars} chars → ${d.chunks} chunks`);
   }
   else if(d.type==='tick'){
     if(j!==WEB_CURRENT_JOB) return;
@@ -1257,22 +1932,21 @@ function webHandleEvent(d){
     $('#web_frac').textContent = WEB_FRACS.length;
     webDrawPlot();
     if(d.fracture) log('#web_log',
-      `<span style="color:#fbbf24">⚡ FRACTURE</span> z=${f2(d.z)} loss=${f3(d.loss)} — <span class="muted">${esc(d.text_preview)}</span>`);
+      `<span style="color:var(--amber)">⚡ FRACTURE</span> z=${f2(d.z)} loss=${f3(d.loss)} — <span class="tag">${esc(d.text_preview)}</span>`);
   }
   else if(d.type==='done'){
     if(j===WEB_CURRENT_JOB) $('#web_status').textContent = 'done';
-    log('#web_log', `<span style="color:#7ee787">[done]</span> job ${j} — final_loss=${f3(d.final_loss)} fractures=${d.fracture_events}`);
+    log('#web_log', `<span style="color:var(--sage)">[done]</span> job ${j} — final_loss=${f3(d.final_loss)} fractures=${d.fracture_events}`);
   }
   else if(d.type==='error'){
     if(j===WEB_CURRENT_JOB) $('#web_status').textContent = 'error';
-    log('#web_log', `<span style="color:#f87171">[error]</span> job ${j} — ${esc(d.error)}`);
+    log('#web_log', `<span style="color:var(--rose)">[error]</span> job ${j} — ${esc(d.error)}`);
   }
   else if(d.type==='cancelled'){
     if(j===WEB_CURRENT_JOB) $('#web_status').textContent = 'cancelled';
-    log('#web_log', `<span style="color:#f87171">[cancelled]</span> job ${j}`);
+    log('#web_log', `<span style="color:var(--rose)">[cancelled]</span> job ${j}`);
   }
 }
-
 function webDrawPlot(){
   const svg = document.getElementById('web_plot'); if(!svg) return;
   const W = svg.clientWidth || 600, H = 180;
@@ -1287,23 +1961,22 @@ function webDrawPlot(){
   let path = '';
   WEB_LOSSES.forEach((v,i) => { path += (i?' L ':'M ') + x(i).toFixed(1) + ' ' + y(v).toFixed(1); });
   const fracMarks = WEB_FRACS.map(i =>
-    `<line x1="${x(i)}" x2="${x(i)}" y1="${pad}" y2="${H-pad}" stroke="#fbbf24" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>`
+    `<line x1="${x(i)}" x2="${x(i)}" y1="${pad}" y2="${H-pad}" stroke="var(--amber)" stroke-width="1" stroke-dasharray="3 3" opacity="0.6"/>`
   ).join('');
   svg.innerHTML = `
     <g>${fracMarks}</g>
-    <path d="${path}" fill="none" stroke="#58a6ff" stroke-width="1.5"/>
-    <text x="${W-pad}" y="${pad-4}" fill="#8b949e" font-size="10" text-anchor="end">max ${f3(hi)}</text>
-    <text x="${W-pad}" y="${H-pad+12}" fill="#8b949e" font-size="10" text-anchor="end">min ${f3(lo)}</text>
+    <path d="${path}" fill="none" stroke="var(--caramel)" stroke-width="1.5"/>
+    <text x="${W-pad}" y="${pad-4}" fill="var(--text-mute)" font-size="10" text-anchor="end" font-family="monospace">max ${f3(hi)}</text>
+    <text x="${W-pad}" y="${H-pad+12}" fill="var(--text-mute)" font-size="10" text-anchor="end" font-family="monospace">min ${f3(lo)}</text>
   `;
 }
-
 async function webLearn(){
   const t = $('#web_input').value.trim();
   if(!t){ toast('enter a URL, arxiv:ID, or wiki:Title'); return; }
   webStartSSE();
   try{
     const d = await apiJSON('/learn/url', {target: t});
-    log('#web_log', `<span style="color:#7ee787">→ queued</span> job ${d.job_id}`);
+    log('#web_log', `<span style="color:var(--sage)">→ queued</span> job ${d.job_id}`);
   }catch(e){}
 }
 function webQuick(t){ $('#web_input').value = t; webLearn(); }
@@ -1319,8 +1992,13 @@ async function webRecall(){
   }catch(e){ $('#web_recall_out').textContent = 'error'; }
 }
 
-// Auto-subscribe to the SSE stream when the tab is opened
-document.querySelector('nav button[data-tab="web"]').addEventListener('click', webStartSSE);
+/* ── utils ── */
+function log(sel, html){
+  const el = document.querySelector(sel); if(!el) return;
+  const d = document.createElement('div'); d.className='line'; d.innerHTML = html;
+  el.appendChild(d); el.scrollTop = el.scrollHeight;
+}
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 </script>
 </body>
 </html>
