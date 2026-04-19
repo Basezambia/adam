@@ -711,6 +711,7 @@ body.in-control #hero-canvas{opacity:.12}
       <button class="tab" data-tab="arcade">⑨ H-CDB Arcade</button>
       <button class="tab" data-tab="learn">⑩ Alive Learning</button>
       <button class="tab" data-tab="web">⑪ Web Learn</button>
+      <button class="tab" data-tab="sudoku">⑫ Sudoku</button>
     </nav>
   </div>
 
@@ -1102,6 +1103,58 @@ body.in-control #hero-canvas{opacity:.12}
                     white-space:pre-wrap; color:var(--text);
                     font-family:var(--mono); font-size:12.5px; line-height:1.6;
                     min-height:60px"></pre>
+      </div>
+    </div>
+
+    <!-- ⑫ Sudoku -->
+    <div class="panel" data-panel="sudoku">
+      <div class="card">
+        <h3>sudoku</h3>
+        <p class="hint">ADAM learns sudoku the same way it learns everything else — via
+          <code>wake_tick</code> on generated puzzle→solution strings, EWC-anchored so its language skills survive.
+          Generate a puzzle, let the ground-truth solver check, then ask ADAM to solve it.</p>
+
+        <div class="row">
+          <label class="hint" style="display:flex;align-items:center;gap:8px">clues
+            <input id="sud_clues" type="number" min="20" max="60" value="36" style="width:60px"/>
+          </label>
+          <button class="btn" onclick="sudGenerate()">Generate puzzle</button>
+          <button class="btn alt" onclick="sudSolveTruth()">Solve (backtracker)</button>
+          <button class="btn alt" onclick="sudSolveAdam()">Ask ADAM</button>
+        </div>
+
+        <div class="row" style="margin-top:14px; gap:24px; align-items:flex-start; flex-wrap:wrap">
+          <div>
+            <h4 style="margin:0 0 6px 0">puzzle</h4>
+            <pre id="sud_puzzle"
+                 style="padding:12px; background:var(--bg-deep); border:1px solid var(--border);
+                        border-radius:4px; font-family:var(--mono); font-size:13px; line-height:1.5;
+                        color:var(--text); min-width:220px; min-height:180px">—</pre>
+          </div>
+          <div>
+            <h4 style="margin:0 0 6px 0">ground truth</h4>
+            <pre id="sud_truth"
+                 style="padding:12px; background:var(--bg-deep); border:1px solid var(--border);
+                        border-radius:4px; font-family:var(--mono); font-size:13px; line-height:1.5;
+                        color:var(--sage); min-width:220px; min-height:180px">—</pre>
+          </div>
+          <div>
+            <h4 style="margin:0 0 6px 0">adam's answer</h4>
+            <pre id="sud_adam"
+                 style="padding:12px; background:var(--bg-deep); border:1px solid var(--border);
+                        border-radius:4px; font-family:var(--mono); font-size:13px; line-height:1.5;
+                        color:var(--caramel); min-width:220px; min-height:180px">—</pre>
+          </div>
+        </div>
+
+        <div class="mini-strip" style="margin-top:16px">
+          <div class="mm"><span class="k">cell accuracy</span><span class="v" id="sud_acc">—</span></div>
+          <div class="mm"><span class="k">filled</span><span class="v" id="sud_filled">—</span></div>
+          <div class="mm"><span class="k">exact match</span><span class="v" id="sud_exact">—</span></div>
+        </div>
+
+        <p class="caption" style="margin-top:12px">Train locally with
+          <code>python train_sudoku.py --steps 20000</code> on your 4050 to bump cell accuracy.</p>
       </div>
     </div>
 
@@ -1990,6 +2043,52 @@ async function webRecall(){
     const d = await apiJSON('/learn/recall', {query: q, max_tokens: 80});
     $('#web_recall_out').textContent = (d.completion ? (q + d.completion) : ('error: '+d.error));
   }catch(e){ $('#web_recall_out').textContent = 'error'; }
+}
+
+/* ── sudoku ── */
+let SUD_PUZZLE = null, SUD_TRUTH = null;
+function _sudPretty(s81){
+  if(!s81 || s81.length!==81) return '—';
+  const lines = [];
+  for(let r=0;r<9;r++){
+    if(r&&r%3===0) lines.push('------+-------+------');
+    const row = [];
+    for(let c=0;c<9;c++){
+      if(c&&c%3===0) row.push('|');
+      const ch = s81[r*9+c];
+      row.push((ch==='.'||ch==='0')?'.':ch);
+    }
+    lines.push(row.join(' '));
+  }
+  return lines.join('\n');
+}
+async function sudGenerate(){
+  const clues = parseInt($('#sud_clues').value||'36',10);
+  const d = await apiJSON('/sudoku/generate', {clues});
+  SUD_PUZZLE = d.puzzle; SUD_TRUTH = d.solution;
+  $('#sud_puzzle').textContent = _sudPretty(d.puzzle);
+  $('#sud_truth').textContent  = '—';
+  $('#sud_adam').textContent   = '—';
+  $('#sud_acc').textContent = '—';
+  $('#sud_filled').textContent = '—';
+  $('#sud_exact').textContent = '—';
+}
+async function sudSolveTruth(){
+  if(!SUD_PUZZLE){ await sudGenerate(); }
+  const d = await apiJSON('/sudoku/solve', {puzzle: SUD_PUZZLE});
+  if(d.ok){ $('#sud_truth').textContent = _sudPretty(d.solution); }
+  else { $('#sud_truth').textContent = 'no solution'; }
+}
+async function sudSolveAdam(){
+  if(!SUD_PUZZLE){ await sudGenerate(); }
+  $('#sud_adam').textContent = '… thinking …';
+  const d = await apiJSON('/sudoku/adam_solve', {puzzle: SUD_PUZZLE});
+  const padded = (d.adam || '').padEnd(81,'.');
+  $('#sud_adam').textContent = _sudPretty(padded);
+  $('#sud_filled').textContent = (d.filled||0) + '/81';
+  $('#sud_acc').textContent = (d.cell_accuracy!=null ? (d.cell_accuracy*100).toFixed(1)+'%' : '—');
+  $('#sud_exact').textContent = d.exact_match ? 'yes' : 'no';
+  if(d.truth) $('#sud_truth').textContent = _sudPretty(d.truth);
 }
 
 /* ── utils ── */

@@ -700,6 +700,73 @@ def learn_recall(inp: RecallInput):
     return {"query": inp.query, "completion": out}
 
 
+# ── Sudoku endpoints ────────────────────────────────────────────────────
+
+@app.post("/sudoku/generate")
+def sudoku_generate(body: dict = Body(...)):
+    from sudoku_dataset import make_puzzle, board_to_str, pretty
+    clues = int(body.get("clues", 36))
+    clues = max(20, min(60, clues))
+    puzzle, solution = make_puzzle(clues=clues)
+    return {
+        "puzzle": board_to_str(puzzle),
+        "solution": board_to_str(solution),
+        "pretty": pretty(puzzle),
+        "clues": clues,
+    }
+
+@app.post("/sudoku/solve")
+def sudoku_solve(body: dict = Body(...)):
+    """Solve via ground-truth backtracker (fast, always correct)."""
+    from sudoku_dataset import solve_str, pretty
+    s = str(body.get("puzzle", "")).strip()
+    if len(s.replace(" ", "").replace("\n", "")) != 81:
+        raise HTTPException(400, "puzzle must be 81 chars (. for blanks)")
+    sol = solve_str(s)
+    if sol is None:
+        return {"ok": False, "error": "no solution"}
+    return {"ok": True, "solution": sol, "pretty": pretty(sol)}
+
+@app.post("/sudoku/adam_solve")
+def sudoku_adam_solve(body: dict = Body(...)):
+    """Ask ADAM to solve — greedy decode from the learned distribution."""
+    from sudoku_dataset import solve_str, str_to_board, board_to_str
+    if MODEL is None:
+        raise HTTPException(503, "model not loaded")
+    s = str(body.get("puzzle", "")).strip().replace(" ", "").replace("\n", "")
+    if len(s) != 81:
+        raise HTTPException(400, "puzzle must be 81 chars")
+    prompt = f"sudoku puzzle: {s} solution: "
+    try:
+        import tiktoken
+        enc = tiktoken.get_encoding("gpt2")
+    except Exception:
+        raise HTTPException(500, "tiktoken unavailable")
+    ids = enc.encode_ordinary(prompt)
+    x = torch.tensor([ids], dtype=torch.long, device=MODEL.device)
+    MODEL.eval()
+    with torch.no_grad():
+        for _ in range(120):
+            logits, _ = MODEL(x)
+            nxt = int(torch.argmax(logits[0, -1]).item())
+            x = torch.cat([x, torch.tensor([[nxt]], device=MODEL.device)], dim=1)
+            if x.size(1) > 400:
+                break
+    out = enc.decode(x[0].tolist())
+    after = out.split("solution:", 1)[-1].strip()
+    digits = "".join(ch for ch in after if ch.isdigit())[:81]
+    # Ground-truth solution for scoring
+    truth = solve_str(s) or ""
+    correct = sum(1 for i, ch in enumerate(digits) if i < len(truth) and ch == truth[i])
+    return {
+        "adam": digits,
+        "truth": truth,
+        "filled": len(digits),
+        "cell_accuracy": correct / 81 if truth else None,
+        "exact_match": (digits == truth),
+    }
+
+
 # ── v0.6 Core-Fused endpoints ──────────────────────────────────────────
 
 @app.get("/v06/status")
