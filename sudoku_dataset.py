@@ -231,6 +231,34 @@ def training_example(clues: int = 36) -> str:
     return f"sudoku puzzle: {board_to_str(puzzle)} solution: {board_to_str(solution)}"
 
 
+def training_example_cot(clues: int = 50, max_steps: int = 20) -> Optional[str]:
+    """Chain-of-thought sudoku example. The model learns to emit naked/hidden
+    singles one at a time, with the board state it sees implicit in history.
+
+    Format:
+        P <81chars>
+        S (r,c)=v
+        S (r,c)=v
+        ...
+        = <81chars>
+
+    Easy puzzles (high clue count) only — so the solve is mostly
+    naked/hidden singles that a small LM can actually learn.
+    Returns None if puzzle cannot be solved with pure logical steps
+    within max_steps.
+    """
+    puzzle, solution = make_puzzle(clues=clues)
+    ps = board_to_str(puzzle)
+    steps, final = solve_with_steps(ps, max_steps=max_steps)
+    if final != board_to_str(solution) or len(steps) == 0:
+        return None
+    parts = [f"P {ps}"]
+    for s in steps:
+        parts.append(f"S ({s['row']+1},{s['col']+1})={s['value']}")
+    parts.append(f"= {final}")
+    return "\n".join(parts)
+
+
 def stream(n: int = 10000, clues_range: Tuple[int, int] = (30, 45)):
     for _ in range(n):
         clues = random.randint(*clues_range)

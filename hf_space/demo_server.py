@@ -67,9 +67,17 @@ def load_adam(checkpoint='adam_checkpoint.pt'):
             try:
                 from huggingface_hub import hf_hub_download, HfApi
                 print(f"[dl] fetching checkpoint from {hf_repo}")
+                # prefer sudoku-finetuned ckpt (better priors for the constrained solver)
                 try:
                     checkpoint = hf_hub_download(repo_id=hf_repo,
-                                                 filename='adam_checkpoint.pt')
+                                                 filename='adam_sudoku_cot.pt')
+                    print("[dl] using adam_sudoku_cot.pt (sudoku-finetuned)")
+                except Exception:
+                    pass
+                try:
+                    if not os.path.exists(checkpoint):
+                        checkpoint = hf_hub_download(repo_id=hf_repo,
+                                                     filename='adam_checkpoint.pt')
                 except Exception:
                     # Single file not present — try chunked reassembly
                     print("[dl] single file missing, trying chunks ckpt_part_*.bin")
@@ -762,34 +770,22 @@ def sudoku_explain(body: dict = Body(...)):
 
 @app.post("/sudoku/adam_solve")
 def sudoku_adam_solve(body: dict = Body(...)):
-    """Ask ADAM to solve — greedy decode from the learned distribution."""
-    from sudoku_dataset import solve_str, str_to_board, board_to_str
+    """ADAM solves via constrained decoding: its logits rank candidates at
+    each cell, backtracking catches dead ends. Output is always sudoku-legal.
+    """
+    from sudoku_dataset import solve_str
+    from adam_sudoku_solve import solve_with_adam
     if MODEL is None:
         raise HTTPException(503, "model not loaded")
     s = str(body.get("puzzle", "")).strip().replace(" ", "").replace("\n", "")
     if len(s) != 81:
         raise HTTPException(400, "puzzle must be 81 chars")
-    prompt = f"sudoku puzzle: {s} solution: "
-    try:
-        import tiktoken
-        enc = tiktoken.get_encoding("gpt2")
-    except Exception:
-        raise HTTPException(500, "tiktoken unavailable")
-    ids = enc.encode_ordinary(prompt)
-    x = torch.tensor([ids], dtype=torch.long, device=MODEL.device)
-    MODEL.eval()
-    with torch.no_grad():
-        for _ in range(120):
-            logits, _ = MODEL(x)
-            nxt = int(torch.argmax(logits[0, -1]).item())
-            x = torch.cat([x, torch.tensor([[nxt]], device=MODEL.device)], dim=1)
-            if x.size(1) > 400:
-                break
-    out = enc.decode(x[0].tolist())
-    after = out.split("solution:", 1)[-1].strip()
-    digits = "".join(ch for ch in after if ch.isdigit())[:81]
-    # Ground-truth solution for scoring
+    import time
+    t0 = time.time()
+    out, steps = solve_with_adam(MODEL, s, max_nodes=20000)
+    dt = time.time() - t0
     truth = solve_str(s) or ""
+    digits = out or ""
     correct = sum(1 for i, ch in enumerate(digits) if i < len(truth) and ch == truth[i])
     return {
         "adam": digits,
@@ -797,6 +793,9 @@ def sudoku_adam_solve(body: dict = Body(...)):
         "filled": len(digits),
         "cell_accuracy": correct / 81 if truth else None,
         "exact_match": (digits == truth),
+        "steps": len(steps),
+        "seconds": round(dt, 2),
+        "method": "constrained-decode + MRV backtrack",
     }
 
 
@@ -917,7 +916,10 @@ def root():
 # ═══════════════════════════════════════════════════════════════════════
 if __name__ == "__main__":
     import uvicorn
-    load_adam()
+    # prefer sudoku-finetuned checkpoint if available (better priors for
+    # constrained solver); otherwise fall back to base.
+    ckpt = 'adam_sudoku_cot.pt.best' if os.path.exists('adam_sudoku_cot.pt.best') else 'adam_checkpoint.pt'
+    load_adam(ckpt)
     port = int(os.environ.get('PORT', 8000))
     print(f"\n[ADAM is alive on http://localhost:{port}/]\n")
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
